@@ -1007,6 +1007,20 @@ button {
   padding: 14px 16px;
 }
 
+.form-row select {
+  color-scheme: dark;
+  background: #171c25;
+  color: #f5f7fa;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.form-row select option {
+  background: #171c25;
+  color: #f5f7fa;
+}
+
 .form-row textarea,
 .settings-form textarea {
   resize: vertical;
@@ -1033,6 +1047,42 @@ button {
 .manual-payment-card {
   margin-bottom: 18px;
   padding: 24px;
+}
+
+.manual-payment-details {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.manual-payment-meta,
+.manual-payment-qr {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.manual-payment-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.manual-payment-value-row strong {
+  word-break: break-all;
+  font-size: 1rem;
+}
+
+.manual-payment-qr img {
+  width: min(280px, 100%);
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 10px;
 }
 
 .support-choice-card {
@@ -1294,6 +1344,112 @@ button {
   gap: 20px;
 }
 
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-tab {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+}
+
+.admin-tab.is-active {
+  border-color: var(--line-strong);
+  color: var(--text);
+  background: rgba(53, 242, 255, 0.09);
+}
+
+.admin-panel {
+  display: none;
+  gap: 24px;
+}
+
+.admin-panel.is-active {
+  display: grid;
+}
+
+.admin-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-metric-card {
+  padding: 22px 24px;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-metric-card span,
+.muted-copy {
+  color: var(--muted);
+}
+
+.admin-metric-card strong {
+  font-family: "Sora", sans-serif;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+}
+
+.admin-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-filter-row select {
+  min-width: 180px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #171c25;
+  color: #f5f7fa;
+  padding: 12px 14px;
+  color-scheme: dark;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.admin-filter-row select:focus {
+  outline: none;
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 3px rgba(53, 242, 255, 0.12);
+}
+
+.admin-filter-row select option {
+  background: #171c25;
+  color: #f5f7fa;
+}
+
+.admin-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .orders-table-wrapper {
   overflow-x: auto;
 }
@@ -1404,6 +1560,16 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .admin-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-section-head,
+  .admin-filter-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .site-contact-grid,
   .form-row,
   .checkout-summary {
@@ -1466,6 +1632,11 @@ button {
 
   .section {
     padding: 34px 0;
+  }
+
+  .manual-payment-value-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .hero-copy h1 {

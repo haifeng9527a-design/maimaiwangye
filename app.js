@@ -32,8 +32,12 @@ const defaultSettings = {
   stripePriceId: "",
   bankTransferText: "",
   cryptoPaymentText: "",
+  cryptoWalletAddress: "",
+  cryptoQrCodeUrl: "",
   wechatPaymentText: "",
-  alipayPaymentText: ""
+  wechatQrCodeUrl: "",
+  alipayPaymentText: "",
+  alipayQrCodeUrl: ""
 };
 
 function getApiBase() {
@@ -45,6 +49,77 @@ function getApiBase() {
 }
 
 const API_BASE = getApiBase();
+const SESSION_STORAGE_KEY = "coldarc_session_id";
+const VISITOR_STORAGE_KEY = "coldarc_visitor_id";
+
+function generateId(prefix = "id") {
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+}
+
+function getSessionId() {
+  const existing = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+  if (existing) {
+    return existing;
+  }
+
+  const value = generateId("sess");
+  window.sessionStorage.setItem(SESSION_STORAGE_KEY, value);
+  return value;
+}
+
+function getVisitorId() {
+  const existing = window.localStorage.getItem(VISITOR_STORAGE_KEY);
+  if (existing) {
+    return existing;
+  }
+
+  const value = generateId("visitor");
+  window.localStorage.setItem(VISITOR_STORAGE_KEY, value);
+  return value;
+}
+
+async function trackEvent(eventType, payload = {}) {
+  try {
+    await fetch(`${API_BASE}/api/analytics/events`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        sessionId: getSessionId(),
+        visitorId: getVisitorId(),
+        eventType,
+        pagePath: window.location.pathname,
+        referrer: document.referrer || "",
+        ...payload
+      })
+    });
+  } catch (_error) {
+    // 埋点失败不影响主流程
+  }
+}
+
+async function fetchProducts() {
+  try {
+    const response = await fetch(`${API_BASE}/api/products`);
+    if (!response.ok) {
+      throw new Error("Failed to load products");
+    }
+
+    const data = await response.json();
+    return Array.isArray(data.products) ? data.products : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function slugify(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 function getPaymentMethodMeta(settings) {
   return {
@@ -56,17 +131,26 @@ function getPaymentMethodMeta(settings) {
     crypto: {
       label: "加密货币付款",
       description: "提交订单后会保留订单，并显示加密货币付款说明，由客服人工确认到账。",
-      manualText: settings.cryptoPaymentText || "请联系客服获取链上收款地址。"
+      manualText: settings.cryptoPaymentText || "请在 10 分钟内按系统生成的唯一 USDT 金额完成付款，到账后系统会自动确认订单。",
+      paymentValueLabel: "USDT-TRC20 收款地址",
+      paymentValue: settings.cryptoWalletAddress || "",
+      paymentQrUrl: settings.cryptoQrCodeUrl || ""
     },
     wechat_pay: {
       label: "微信付款",
       description: "提交订单后会显示微信付款说明，请按后台说明完成支付并联系客服确认。",
-      manualText: settings.wechatPaymentText || "请联系客服获取微信付款方式。"
+      manualText: settings.wechatPaymentText || "请直接使用微信收款码完成支付，付款后联系客服确认。",
+      paymentValueLabel: "微信付款说明",
+      paymentValue: "",
+      paymentQrUrl: settings.wechatQrCodeUrl || ""
     },
     alipay: {
       label: "支付宝付款",
       description: "提交订单后会显示支付宝付款说明，请按后台说明完成支付并联系客服确认。",
-      manualText: settings.alipayPaymentText || "请联系客服获取支付宝付款方式。"
+      manualText: settings.alipayPaymentText || "请直接使用支付宝收款码完成支付，付款后联系客服确认。",
+      paymentValueLabel: "支付宝付款说明",
+      paymentValue: "",
+      paymentQrUrl: settings.alipayQrCodeUrl || ""
     },
     stripe: {
       label: "Stripe 在线支付（备用）",
@@ -275,7 +359,7 @@ function renderContactList(container, settings) {
       return `<div class="contact-link is-disabled">${content.replace("↗", "")}</div>`;
     }
 
-    return `<a class="contact-link is-ready" href="${item.href}" target="_blank" rel="noreferrer">${content}</a>`;
+    return `<a class="contact-link is-ready" href="${item.href}" target="_blank" rel="noreferrer" data-contact-channel="${item.key}">${content}</a>`;
   }).join("");
 }
 
@@ -300,7 +384,7 @@ function renderSupportContactOptions(container, contacts) {
   }
 
   container.innerHTML = items.map((item) => `
-    <a class="contact-link is-ready" href="${item.href}" target="_blank" rel="noreferrer">
+    <a class="contact-link is-ready" href="${item.href}" target="_blank" rel="noreferrer" data-contact-channel="${item.type}">
       <span class="contact-icon contact-icon-${item.type}">
         ${getContactIcon(item.type)}
       </span>
@@ -384,7 +468,7 @@ function renderFloatingSupportWidget(settings) {
       return `<div class="floating-support-item is-disabled">${content}</div>`;
     }
 
-    return `<a class="floating-support-item" href="${item.href}" target="_blank" rel="noreferrer">${content}</a>`;
+    return `<a class="floating-support-item" href="${item.href}" target="_blank" rel="noreferrer" data-contact-channel="${item.key}">${content}</a>`;
   }).join("");
 
   if (!toggle.dataset.bound) {
@@ -430,6 +514,154 @@ function populateContactSections(settings) {
   }
 }
 
+function formatUsdPrice(value) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  }).format(Number(value || 0));
+}
+
+function applyImage(node, src, alt) {
+  if (!node || !src) {
+    return;
+  }
+
+  node.src = src;
+  if (alt) {
+    node.alt = alt;
+  }
+}
+
+function renderHomeProduct(product) {
+  if (!product || !document.getElementById("home-product-name")) {
+    return;
+  }
+
+  const gallery = Array.isArray(product.galleryImageUrls) ? product.galleryImageUrls : [];
+  const primaryImage = product.primaryImageUrl || gallery[0] || "";
+  const secondaryImage = gallery[1] || gallery[0] || primaryImage;
+
+  const nameNode = document.getElementById("home-product-name");
+  const subtitleNode = document.getElementById("home-product-subtitle");
+
+  nameNode.textContent = "Ledger 授权现货与多型号选购";
+  subtitleNode.textContent = "主推品牌信任感与授权渠道保障，具体型号可在下方列表查看，并在下单页选择最适合你的版本。";
+
+  applyImage(document.getElementById("home-product-primary-image"), primaryImage, "Ledger 品牌主图");
+  applyImage(document.getElementById("home-product-secondary-image"), secondaryImage, "Ledger 品牌细节图");
+
+  const galleryNode = document.getElementById("home-product-gallery");
+  if (galleryNode && gallery.length) {
+    galleryNode.innerHTML = gallery.slice(0, 3).map((src, index) => `
+      <figure class="real-shot reveal">
+        <img src="${src}" alt="${product.name} 图片 ${index + 1}">
+      </figure>
+    `).join("");
+  }
+}
+
+function renderHomeProductGrid(products = []) {
+  const container = document.getElementById("home-product-grid");
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML = products.map((product, index) => {
+    const gallery = Array.isArray(product.galleryImageUrls) ? product.galleryImageUrls : [];
+    const imageUrl = product.primaryImageUrl || gallery[0] || "assets/images/ledger-hero.jpg";
+    const bullets = [product.summary, product.subtitle, product.description]
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+      .slice(0, 3);
+
+    return `
+      <article class="product-card ${index === 0 ? "featured" : ""} reveal">
+        <img class="card-thumb" src="${imageUrl}" alt="${product.name} 展示图">
+        <p class="product-tag">${index === 0 ? "热门型号" : "在售型号"}</p>
+        <h3>${product.name}</h3>
+        <p>${product.summary || product.subtitle || "支持现货下单与发货说明。"}</p>
+        <div class="price-row">
+          <strong>${formatUsdPrice(product.priceUsd)}</strong>
+          <span>${product.comparePriceUsd ? `原价 ${formatUsdPrice(product.comparePriceUsd)}` : "现货速发"}</span>
+        </div>
+        <ul class="bullet-list">
+          ${(bullets.length ? bullets : ["支持现货下单与发货说明"]).map((item) => `<li>${item}</li>`).join("")}
+        </ul>
+        <div class="purchase-actions">
+          <a class="button button-secondary" href="/checkout?product=${encodeURIComponent(product.slug)}">下单选择此型号</a>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderProductModelGrid(products = []) {
+  const container = document.getElementById("product-model-grid");
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML = products.map((product, index) => {
+    const gallery = Array.isArray(product.galleryImageUrls) ? product.galleryImageUrls : [];
+    const imageUrl = product.primaryImageUrl || gallery[0] || "assets/images/ledger-hero.jpg";
+    return `
+      <article class="product-card ${index === 0 ? "featured" : ""} reveal">
+        <img class="card-thumb" src="${imageUrl}" alt="${product.name} 型号图">
+        <p class="product-tag">${index === 0 ? "热门型号" : "在售型号"}</p>
+        <h3>${product.name}</h3>
+        <p>${product.summary || product.subtitle || "支持现货下单与发货说明。"}</p>
+        <div class="price-row">
+          <strong>${formatUsdPrice(product.priceUsd)}</strong>
+          <span>${product.comparePriceUsd ? `原价 ${formatUsdPrice(product.comparePriceUsd)}` : "下单页选择型号"}</span>
+        </div>
+        <div class="purchase-actions">
+          <a class="button button-secondary" href="/checkout?product=${encodeURIComponent(product.slug)}">选择这个型号</a>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderProductPage(product, products = []) {
+  if (!product || !document.getElementById("product-page-name")) {
+    return;
+  }
+
+  const gallery = Array.isArray(product.galleryImageUrls) ? product.galleryImageUrls : [];
+  const primaryImage = product.primaryImageUrl || gallery[0] || "";
+
+  document.getElementById("product-page-name").textContent = "Ledger 授权现货与型号选择";
+  document.getElementById("product-page-side-name").textContent = "Ledger 授权经销";
+  document.getElementById("product-page-subtitle").textContent = "先了解品牌、授权渠道、包装与交付方式，再在下方查看多个在售型号，最后到下单页选择具体版本。";
+  document.getElementById("product-page-summary").textContent = `当前支持 ${products.length || 1} 个在售型号，可在下单页按需求选择。`;
+  document.getElementById("product-page-detail-name").textContent = "品牌与包装说明";
+  document.getElementById("product-page-description").textContent = "这里重点展示 Ledger 品牌、包装交付和购买说明；具体型号、价格和版本差异，请以下方在售型号列表与下单页为准。";
+  document.getElementById("product-page-price").textContent = `${products.length || 1} 个型号可选`;
+
+  applyImage(document.getElementById("product-page-primary-image"), primaryImage, "Ledger 品牌主展示图");
+  applyImage(document.getElementById("product-page-gallery-image-1"), gallery[1] || primaryImage, "Ledger 型号侧面图");
+  applyImage(document.getElementById("product-page-gallery-image-2"), gallery[2] || gallery[1] || primaryImage, "Ledger 型号细节图");
+}
+
+async function hydrateProductContent() {
+  if (document.body.dataset.page === "admin") {
+    return;
+  }
+
+  const products = await fetchProducts();
+  const product = products[0];
+  if (!product) {
+    return;
+  }
+
+  renderHomeProduct(product);
+  renderHomeProductGrid(products);
+  renderProductModelGrid(products);
+  renderProductPage(product, products);
+}
+
 function parseQuery() {
   return new URLSearchParams(window.location.search);
 }
@@ -443,12 +675,55 @@ function formatCurrency(amountCents, currency = "usd") {
 
 function formatPaymentMethodLabel(method) {
   return {
-    stripe: "Stripe",
+    stripe: "在线支付",
     crypto: "加密货币",
     bank_transfer: "银行转账",
     wechat_pay: "微信付款",
     alipay: "支付宝"
   }[method] || method;
+}
+
+function formatOrderStatusLabel(status) {
+  return {
+    pending: "待处理",
+    confirmed: "已确认",
+    processing: "处理中",
+    shipped: "已发货",
+    completed: "已完成",
+    cancelled: "已取消"
+  }[status] || status;
+}
+
+function formatPaymentStatusLabel(status) {
+  return {
+    pending: "待付款",
+    paid: "已付款",
+    manual_review: "人工确认中",
+    cancelled: "已取消"
+  }[status] || status;
+}
+
+function formatContactChannelLabel(channel) {
+  return {
+    whatsapp: "WhatsApp",
+    telegram: "Telegram",
+    email: "邮箱",
+    phone: "电话",
+    instagram: "Instagram",
+    wechat: "微信",
+    bank_transfer: "银行转账",
+    crypto: "加密货币",
+    wechat_pay: "微信付款",
+    alipay: "支付宝"
+  }[channel] || channel || "-";
+}
+
+function formatTrafficSourceLabel(source) {
+  if (!source || source === "direct") {
+    return "直接访问";
+  }
+
+  return source;
 }
 
 async function handleCheckoutForm() {
@@ -458,42 +733,139 @@ async function handleCheckoutForm() {
   }
 
   const settings = await fetchSettings();
+  const products = await fetchProducts();
   const statusNode = document.getElementById("checkout-status");
   const amountNode = document.getElementById("checkout-amount-label");
   const paymentLabelNode = document.getElementById("checkout-payment-label");
   const paymentDescriptionNode = document.getElementById("checkout-payment-description");
   const manualPaymentCard = document.getElementById("manual-payment-card");
   const manualPaymentText = document.getElementById("manual-payment-text");
+  const manualPaymentDetails = document.getElementById("manual-payment-details");
+  const manualPaymentMeta = document.getElementById("manual-payment-meta");
+  const manualPaymentMetaLabel = document.getElementById("manual-payment-meta-label");
+  const manualPaymentMetaValue = document.getElementById("manual-payment-meta-value");
+  const manualPaymentQr = document.getElementById("manual-payment-qr");
+  const manualPaymentQrImage = document.getElementById("manual-payment-qr-image");
+  const manualPaymentCopyButton = document.getElementById("manual-payment-copy-button");
   const supportContactActions = document.getElementById("support-contact-actions");
   const supportContactOptions = document.getElementById("support-contact-options");
+  const cryptoVerificationCard = document.getElementById("crypto-verification-card");
+  const cryptoVerifyButton = document.getElementById("crypto-verify-button");
+  const cryptoVerifyStatus = document.getElementById("crypto-verify-status");
+  const cryptoVerificationDescription = document.getElementById("crypto-verification-description");
   const quantityInput = form.elements.namedItem("quantity");
   const productInput = form.elements.namedItem("productName");
   const paymentMethodInput = form.elements.namedItem("paymentMethod");
+  let currentOrderNo = "";
+  let currentPaymentMethod = String(paymentMethodInput.value || "");
+  let currentCryptoExpectedAmount = "";
+  let currentCryptoPaymentExpiresAt = "";
 
-  const productPrices = {
-    "Ledger Nano X": 19900,
-    "Ledger Nano S Plus": 11900
-  };
+  const fallbackProducts = [
+    {
+      slug: "ledger-nano-x",
+      name: "Ledger Nano X",
+      priceUsd: 199
+    }
+  ];
+  const activeProducts = products.length ? products : fallbackProducts;
+
+  if (productInput) {
+    productInput.innerHTML = activeProducts.map((product) => `
+      <option value="${product.name}" data-product-slug="${product.slug}" data-price-usd="${product.priceUsd}">
+        ${product.name}
+      </option>
+    `).join("");
+
+    const query = parseQuery();
+    const requestedProduct = query.get("product");
+    if (requestedProduct) {
+      const targetOption = Array.from(productInput.options).find((option) => option.dataset.productSlug === requestedProduct);
+      if (targetOption) {
+        productInput.value = targetOption.value;
+      }
+    }
+  }
 
   const paymentMeta = getPaymentMethodMeta(settings);
 
+  const renderManualPaymentDetails = (meta) => {
+    const paymentValue = String(meta?.paymentValue || "").trim();
+    const paymentQrUrl = String(meta?.paymentQrUrl || "").trim();
+
+    if (!manualPaymentDetails || !manualPaymentMeta || !manualPaymentMetaLabel || !manualPaymentMetaValue || !manualPaymentQr || !manualPaymentQrImage || !manualPaymentCopyButton) {
+      return;
+    }
+
+    if (!paymentValue && !paymentQrUrl) {
+      manualPaymentDetails.classList.add("hidden");
+      manualPaymentMeta.classList.add("hidden");
+      manualPaymentQr.classList.add("hidden");
+      manualPaymentCopyButton.classList.add("hidden");
+      manualPaymentCopyButton.dataset.copyValue = "";
+      manualPaymentQrImage.removeAttribute("src");
+      return;
+    }
+
+    manualPaymentDetails.classList.remove("hidden");
+
+    if (paymentValue) {
+      manualPaymentMeta.classList.remove("hidden");
+      manualPaymentMetaLabel.textContent = meta.paymentValueLabel || "收款信息";
+      manualPaymentMetaValue.textContent = paymentValue;
+      manualPaymentCopyButton.classList.remove("hidden");
+      manualPaymentCopyButton.dataset.copyValue = paymentValue;
+    } else {
+      manualPaymentMeta.classList.add("hidden");
+      manualPaymentCopyButton.classList.add("hidden");
+      manualPaymentCopyButton.dataset.copyValue = "";
+    }
+
+    if (paymentQrUrl) {
+      manualPaymentQr.classList.remove("hidden");
+      manualPaymentQrImage.src = paymentQrUrl;
+      manualPaymentQrImage.alt = `${meta.label}收款码`;
+    } else {
+      manualPaymentQr.classList.add("hidden");
+      manualPaymentQrImage.removeAttribute("src");
+    }
+  };
+
   const updatePaymentUi = () => {
     const method = paymentMethodInput.value;
-    const meta = paymentMeta[method] || paymentMeta.stripe;
+    currentPaymentMethod = method;
+    const meta = paymentMeta[method] || paymentMeta.bank_transfer;
     paymentLabelNode.textContent = meta.label;
     paymentDescriptionNode.textContent = meta.description;
 
     if (method === "stripe") {
       manualPaymentCard.classList.add("hidden");
+      if (manualPaymentDetails) {
+        manualPaymentDetails.classList.add("hidden");
+      }
+      if (cryptoVerificationCard) {
+        cryptoVerificationCard.classList.add("hidden");
+      }
       return;
     }
 
     manualPaymentCard.classList.remove("hidden");
     manualPaymentText.textContent = meta.manualText;
+    renderManualPaymentDetails(meta);
+
+    if (cryptoVerificationCard) {
+      const showCryptoVerify = method === "crypto" && currentOrderNo;
+      cryptoVerificationCard.classList.toggle("hidden", !showCryptoVerify);
+      if (!showCryptoVerify && cryptoVerifyStatus) {
+        cryptoVerifyStatus.textContent = "";
+      }
+    }
   };
 
   const updateAmountLabel = () => {
-    const price = productPrices[productInput.value] || 19900;
+    const selectedOption = productInput.selectedOptions?.[0];
+    const priceUsd = Number(selectedOption?.dataset.priceUsd || activeProducts[0]?.priceUsd || 199);
+    const price = Math.round(priceUsd * 100);
     const quantity = Math.max(Number(quantityInput.value || 1), 1);
     amountNode.textContent = formatCurrency(price * quantity);
   };
@@ -504,17 +876,37 @@ async function handleCheckoutForm() {
   productInput.addEventListener("change", updateAmountLabel);
   paymentMethodInput.addEventListener("change", updatePaymentUi);
 
+  if (manualPaymentCopyButton) {
+    manualPaymentCopyButton.addEventListener("click", async () => {
+      const copyValue = manualPaymentCopyButton.dataset.copyValue || "";
+      if (!copyValue) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(copyValue);
+        statusNode.textContent = "收款地址已复制，请完成付款后联系客服确认。";
+      } catch (_error) {
+        statusNode.textContent = "复制失败，请手动复制当前收款地址。";
+      }
+    });
+  }
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     statusNode.textContent = "正在创建订单，请稍候...";
 
     const formData = new FormData(form);
     const productName = formData.get("productName");
+    const selectedOption = productInput.selectedOptions?.[0];
+    const productSlug = selectedOption?.dataset.productSlug || slugify(productName);
     const quantity = Math.max(Number(formData.get("quantity") || 1), 1);
-    const amountCents = (productPrices[productName] || 19900) * quantity;
+    const unitPriceUsd = Number(selectedOption?.dataset.priceUsd || activeProducts[0]?.priceUsd || 199);
+    const amountCents = Math.round(unitPriceUsd * 100) * quantity;
 
     const payload = {
       productName,
+      productSlug,
       quantity,
       amountCents,
       currency: "usd",
@@ -550,9 +942,19 @@ async function handleCheckoutForm() {
         return;
       }
 
+      currentOrderNo = data.orderNo || "";
+      currentCryptoExpectedAmount = data.cryptoExpectedAmount ? String(data.cryptoExpectedAmount) : "";
+      currentCryptoPaymentExpiresAt = data.cryptoPaymentExpiresAt || "";
+
       if (data.manualPaymentInstructions) {
         manualPaymentCard.classList.remove("hidden");
         manualPaymentText.textContent = data.manualPaymentInstructions;
+        const paymentDetailsMeta = { ...(paymentMeta[payload.paymentMethod] || paymentMeta.bank_transfer) };
+        if (payload.paymentMethod === "crypto" && currentCryptoExpectedAmount) {
+          paymentDetailsMeta.paymentValueLabel = "应付唯一金额";
+          paymentDetailsMeta.paymentValue = `${Number(currentCryptoExpectedAmount).toFixed(3)} USDT`;
+        }
+        renderManualPaymentDetails(paymentDetailsMeta);
       }
 
       if (supportContactActions && supportContactOptions && Array.isArray(data.supportContacts)) {
@@ -565,10 +967,67 @@ async function handleCheckoutForm() {
       statusNode.textContent = data.message
         ? `${data.message} 订单号：${data.orderNo}`
         : `订单已创建。订单号：${data.orderNo}`;
+
+      await trackEvent("order_created", {
+        orderNo: data.orderNo,
+        channel: payload.paymentMethod,
+        customerName: payload.customerName,
+        email: payload.email,
+        phone: payload.phone,
+        metadata: {
+          productName: payload.productName,
+          quantity: payload.quantity
+        }
+      });
+
+      if (cryptoVerificationCard) {
+        const showCryptoVerify = payload.paymentMethod === "crypto" && currentOrderNo;
+        cryptoVerificationCard.classList.toggle("hidden", !showCryptoVerify);
+        if (showCryptoVerify && cryptoVerificationDescription && currentCryptoExpectedAmount) {
+          const expiryText = currentCryptoPaymentExpiresAt
+            ? new Date(currentCryptoPaymentExpiresAt).toLocaleString("zh-CN")
+            : "10 分钟内";
+          cryptoVerificationDescription.textContent = `请在 ${expiryText} 前支付 ${Number(currentCryptoExpectedAmount).toFixed(3)} USDT。系统会自动匹配到账金额并确认订单。`;
+        }
+      }
     } catch (error) {
       statusNode.textContent = error.message || "订单提交失败，请稍后重试。";
     }
   });
+
+  if (cryptoVerifyButton && cryptoVerifyStatus) {
+    cryptoVerifyButton.addEventListener("click", async () => {
+      if (!currentOrderNo) {
+        cryptoVerifyStatus.textContent = "请先提交订单，再检查到账状态。";
+        return;
+      }
+
+      if (currentPaymentMethod !== "crypto") {
+        cryptoVerifyStatus.textContent = "当前订单不是加密货币付款订单。";
+        return;
+      }
+
+      cryptoVerifyStatus.textContent = "正在检查链上到账记录，请稍候...";
+      try {
+        const response = await fetch(`${API_BASE}/api/orders/${encodeURIComponent(currentOrderNo)}/verify-crypto`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "自动核单失败。");
+        }
+
+        cryptoVerifyStatus.textContent = data.message || "付款已确认，商家正在准备发货。";
+        statusNode.textContent = `${data.message || "付款已确认。"} 订单号：${currentOrderNo}`;
+      } catch (error) {
+        cryptoVerifyStatus.textContent = error.message || "暂未匹配到到账记录，请稍后重试。";
+      }
+    });
+  }
 }
 
 async function handleSuccessPage() {
@@ -612,33 +1071,128 @@ async function handleSuccessPage() {
 }
 
 let adminOrders = [];
+let adminProducts = [];
+
+function setAdminTab(tabId) {
+  document.querySelectorAll(".admin-tab").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.adminTab === tabId);
+  });
+  document.querySelectorAll(".admin-panel").forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.adminPanel === tabId);
+  });
+}
+
+function renderSummary(summary = {}) {
+  const mapping = {
+    "metric-visits-today": summary.visitsToday || 0,
+    "metric-unique-visitors": summary.uniqueVisitorsToday || 0,
+    "metric-recent-orders": summary.recentOrderCount || 0,
+    "metric-pending-payment": summary.pendingPaymentCount || 0,
+    "metric-pending-shipment": summary.pendingShipmentCount || 0,
+    "metric-shipped": summary.shippedCount || 0
+  };
+
+  Object.entries(mapping).forEach(([id, value]) => {
+    const node = document.getElementById(id);
+    if (node) {
+      node.textContent = String(value);
+    }
+  });
+
+  const topPagesList = document.getElementById("top-pages-list");
+  if (topPagesList) {
+    const items = summary.topPages || [];
+    topPagesList.innerHTML = items.map((item) => `
+      <div class="admin-list-row">
+        <span>${item.pagePath}</span>
+        <strong>${item.count}</strong>
+      </div>
+    `).join("") || "<p class='muted-copy'>暂无访问数据</p>";
+  }
+
+  const topSourcesList = document.getElementById("top-sources-list");
+  if (topSourcesList) {
+    const items = summary.topSources || [];
+    topSourcesList.innerHTML = items.map((item) => `
+      <div class="admin-list-row">
+        <span>${formatTrafficSourceLabel(item.source)}</span>
+        <strong>${item.count}</strong>
+      </div>
+    `).join("") || "<p class='muted-copy'>暂无来源数据</p>";
+  }
+}
+
+function getFilteredOrders() {
+  const paymentFilter = document.getElementById("order-payment-filter")?.value || "";
+  const statusFilter = document.getElementById("order-status-filter")?.value || "";
+  return adminOrders.filter((order) => {
+    const paymentMatch = !paymentFilter || order.payment_status === paymentFilter;
+    const statusMatch = !statusFilter || order.order_status === statusFilter;
+    return paymentMatch && statusMatch;
+  });
+}
 
 function renderOrders(orders) {
+  adminOrders = orders;
   const tbody = document.getElementById("orders-table-body");
   if (!tbody) {
     return;
   }
 
-  adminOrders = orders;
-  tbody.innerHTML = orders.map((order) => `
+  const filteredOrders = getFilteredOrders();
+  tbody.innerHTML = filteredOrders.map((order) => `
     <tr>
       <td>${order.order_no}</td>
-      <td>
-        <strong>${order.customer_name}</strong>
-        <div>${order.email}</div>
-        <div>${order.phone}</div>
-      </td>
+      <td><strong>${order.customer_name}</strong><div>${order.email}</div><div>${order.phone}</div></td>
       <td>${order.product_name} x ${order.quantity}</td>
       <td>${formatPaymentMethodLabel(order.payment_method)}</td>
-      <td><span class="status-pill">${order.payment_status}</span></td>
-      <td><span class="status-pill">${order.order_status}</span></td>
+      <td><span class="status-pill">${formatPaymentStatusLabel(order.payment_status)}</span></td>
+      <td><span class="status-pill">${formatOrderStatusLabel(order.order_status)}</span></td>
+      <td><button class="button button-ghost small-button" type="button" data-action="select-order" data-order-no="${order.order_no}">处理</button></td>
+    </tr>
+  `).join("") || "<tr><td colspan='7'>暂无订单</td></tr>";
+}
+
+function renderContactEvents(events = []) {
+  const tbody = document.getElementById("contact-events-table-body");
+  if (!tbody) {
+    return;
+  }
+
+  tbody.innerHTML = events.map((event) => `
+    <tr>
+      <td>${new Date(event.created_at).toLocaleString("zh-CN")}</td>
+      <td>${formatContactChannelLabel(event.channel)}</td>
+      <td>${event.page_path || "-"}</td>
+      <td>${event.order_no || "-"}</td>
       <td>
-        <button class="button button-ghost small-button" type="button" data-action="select-order" data-order-no="${order.order_no}">
-          处理订单
-        </button>
+        <strong>${event.customer_name || "匿名访客"}</strong>
+        <div>${event.email || "-"}</div>
+        <div>${event.phone || "-"}</div>
       </td>
     </tr>
-  `).join("");
+  `).join("") || "<tr><td colspan='5'>暂无线索</td></tr>";
+}
+
+function renderProducts(products = []) {
+  adminProducts = products;
+  const tbody = document.getElementById("products-table-body");
+  if (!tbody) {
+    return;
+  }
+
+  tbody.innerHTML = products.map((product) => `
+    <tr>
+      <td>${product.name}</td>
+      <td>${product.slug}</td>
+      <td>${formatUsdPrice(product.priceUsd)}</td>
+      <td><span class="status-pill">${product.isActive ? "已上架" : "已下架"}</span></td>
+      <td>
+        <button class="button button-ghost small-button" type="button" data-action="select-product" data-product-id="${product.id}">编辑</button>
+        <button class="button button-ghost small-button" type="button" data-action="delete-product" data-product-id="${product.id}">删除</button>
+      </td>
+    </tr>
+  `).join("") || "<tr><td colspan='5'>暂无商品</td></tr>";
 }
 
 function populateOrderEditor(order) {
@@ -655,7 +1209,7 @@ function populateOrderEditor(order) {
     shippingCarrier: order.shipping_carrier || "",
     trackingNumber: order.tracking_number || "",
     trackingUrl: order.tracking_url || "",
-    paymentReference: order.payment_reference || "",
+    paymentReference: order.crypto_txid || order.payment_reference || "",
     adminNote: order.admin_note || ""
   };
 
@@ -667,7 +1221,36 @@ function populateOrderEditor(order) {
   });
 }
 
-async function loadAdminDashboard(token) {
+function populateProductForm(product) {
+  const form = document.getElementById("product-form");
+  if (!form) {
+    return;
+  }
+
+  const payload = product || {
+    id: "",
+    name: "",
+    slug: "",
+    subtitle: "",
+    summary: "",
+    priceUsd: 199,
+    comparePriceUsd: "",
+    sortOrder: 1,
+    isActive: true,
+    primaryImageUrl: "",
+    description: "",
+    galleryImageUrls: []
+  };
+
+  Object.entries(payload).forEach(([key, value]) => {
+    const field = form.elements.namedItem(key);
+    if (field) {
+      field.value = Array.isArray(value) ? value.join("\n") : (value ?? "");
+    }
+  });
+}
+
+async function fetchAdminDashboardData(token) {
   const response = await fetch(`${API_BASE}/api/admin/dashboard`, {
     headers: {
       Authorization: `Bearer ${token}`
@@ -679,21 +1262,45 @@ async function loadAdminDashboard(token) {
     throw new Error(data.error || "后台数据加载失败。");
   }
 
-  const loginPanel = document.getElementById("admin-login-panel");
-  const dashboard = document.getElementById("admin-dashboard");
-  loginPanel.classList.add("hidden");
-  dashboard.classList.remove("hidden");
+  return data;
+}
+
+async function loadAdminDashboard(token) {
+  const data = await fetchAdminDashboardData(token);
+  document.getElementById("admin-login-panel")?.classList.add("hidden");
+  document.getElementById("admin-dashboard")?.classList.remove("hidden");
 
   const settingsForm = document.getElementById("settings-form");
   Object.entries(data.settings || {}).forEach(([key, value]) => {
-    const field = settingsForm.elements.namedItem(key);
+    const field = settingsForm?.elements.namedItem(key);
     if (field) {
       field.value = value || "";
     }
   });
 
+  renderSummary(data.summary || {});
   renderOrders(data.orders || []);
+  renderContactEvents(data.contactEvents || []);
+  renderProducts(data.products || []);
   populateOrderEditor((data.orders || [])[0]);
+  populateProductForm((data.products || [])[0]);
+  setAdminTab("dashboard");
+}
+
+async function updateOrder(token, orderNo, payload) {
+  const response = await fetch(`${API_BASE}/api/admin/orders/${orderNo}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "订单更新失败。");
+  }
 }
 
 async function handleAdminPage() {
@@ -702,14 +1309,27 @@ async function handleAdminPage() {
     return;
   }
 
+  const tokenKey = "coldarc_admin_token";
   const loginStatus = document.getElementById("admin-login-status");
   const settingsStatus = document.getElementById("settings-status");
-  const logoutButton = document.getElementById("admin-logout");
+  const orderEditorStatus = document.getElementById("order-editor-status");
+  const productStatus = document.getElementById("product-status");
   const settingsForm = document.getElementById("settings-form");
   const orderEditorForm = document.getElementById("order-editor-form");
-  const orderEditorStatus = document.getElementById("order-editor-status");
+  const productForm = document.getElementById("product-form");
   const markShippedButton = document.getElementById("mark-shipped-button");
-  const tokenKey = "coldarc_admin_token";
+  const logoutButton = document.getElementById("admin-logout");
+  const productResetButton = document.getElementById("product-reset-button");
+  const productDeleteButton = document.getElementById("product-delete-button");
+
+  const refresh = async () => {
+    const token = window.localStorage.getItem(tokenKey);
+    if (!token) {
+      throw new Error("请先重新登录。");
+    }
+    await loadAdminDashboard(token);
+    return token;
+  };
 
   const savedToken = window.localStorage.getItem(tokenKey);
   if (savedToken) {
@@ -728,15 +1348,12 @@ async function handleAdminPage() {
     try {
       const response = await fetch(`${API_BASE}/api/admin/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: formData.get("username"),
           password: formData.get("password")
         })
       });
-
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || "登录失败。");
@@ -750,19 +1367,23 @@ async function handleAdminPage() {
     }
   });
 
-  settingsForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const token = window.localStorage.getItem(tokenKey);
-    if (!token) {
-      settingsStatus.textContent = "请先重新登录。";
+  document.getElementById("admin-tabs")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-admin-tab]");
+    if (!button) {
       return;
     }
+    setAdminTab(button.dataset.adminTab);
+  });
 
+  document.getElementById("order-payment-filter")?.addEventListener("change", () => renderOrders(adminOrders));
+  document.getElementById("order-status-filter")?.addEventListener("change", () => renderOrders(adminOrders));
+
+  settingsForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
     settingsStatus.textContent = "正在保存设置...";
-    const formData = new FormData(settingsForm);
-    const payload = Object.fromEntries(formData.entries());
-
     try {
+      const token = await refresh();
+      const payload = Object.fromEntries(new FormData(settingsForm).entries());
       const response = await fetch(`${API_BASE}/api/settings`, {
         method: "PUT",
         headers: {
@@ -771,26 +1392,20 @@ async function handleAdminPage() {
         },
         body: JSON.stringify(payload)
       });
-
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || "设置保存失败。");
       }
-
       settingsStatus.textContent = "设置已保存。";
+      await loadAdminDashboard(token);
+      setAdminTab("settings");
     } catch (error) {
       settingsStatus.textContent = error.message || "设置保存失败。";
     }
   });
 
-  orderEditorForm.addEventListener("submit", async (event) => {
+  orderEditorForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const token = window.localStorage.getItem(tokenKey);
-    if (!token) {
-      orderEditorStatus.textContent = "请先重新登录。";
-      return;
-    }
-
     const formData = new FormData(orderEditorForm);
     const orderNo = formData.get("orderNo");
     if (!orderNo) {
@@ -800,43 +1415,27 @@ async function handleAdminPage() {
 
     orderEditorStatus.textContent = "正在保存订单信息...";
     try {
-      const response = await fetch(`${API_BASE}/api/admin/orders/${orderNo}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          paymentStatus: formData.get("paymentStatus"),
-          orderStatus: formData.get("orderStatus"),
-          shippingCarrier: formData.get("shippingCarrier"),
-          trackingNumber: formData.get("trackingNumber"),
-          trackingUrl: formData.get("trackingUrl"),
-          paymentReference: formData.get("paymentReference"),
-          adminNote: formData.get("adminNote"),
-          sendShippingEmail: false
-        })
+      const token = window.localStorage.getItem(tokenKey);
+      await updateOrder(token, orderNo, {
+        paymentStatus: formData.get("paymentStatus"),
+        orderStatus: formData.get("orderStatus"),
+        shippingCarrier: formData.get("shippingCarrier"),
+        trackingNumber: formData.get("trackingNumber"),
+        trackingUrl: formData.get("trackingUrl"),
+        paymentReference: formData.get("paymentReference"),
+        adminNote: formData.get("adminNote"),
+        sendShippingEmail: false
       });
-
-      if (!response.ok) {
-        throw new Error("订单处理信息保存失败。");
-      }
-
       orderEditorStatus.textContent = "订单处理信息已保存。";
       await loadAdminDashboard(token);
+      setAdminTab("orders");
       populateOrderEditor(adminOrders.find((order) => order.order_no === orderNo));
-    } catch (_error) {
-      orderEditorStatus.textContent = "订单处理信息保存失败。";
+    } catch (error) {
+      orderEditorStatus.textContent = error.message || "订单处理信息保存失败。";
     }
   });
 
-  markShippedButton.addEventListener("click", async () => {
-    const token = window.localStorage.getItem(tokenKey);
-    if (!token) {
-      orderEditorStatus.textContent = "请先重新登录。";
-      return;
-    }
-
+  markShippedButton?.addEventListener("click", async () => {
     const formData = new FormData(orderEditorForm);
     const orderNo = formData.get("orderNo");
     if (!orderNo) {
@@ -846,50 +1445,141 @@ async function handleAdminPage() {
 
     orderEditorStatus.textContent = "正在标记发货并发送通知...";
     try {
-      const response = await fetch(`${API_BASE}/api/admin/orders/${orderNo}`, {
-        method: "PATCH",
+      const token = window.localStorage.getItem(tokenKey);
+      await updateOrder(token, orderNo, {
+        paymentStatus: formData.get("paymentStatus"),
+        orderStatus: "shipped",
+        shippingCarrier: formData.get("shippingCarrier"),
+        trackingNumber: formData.get("trackingNumber"),
+        trackingUrl: formData.get("trackingUrl"),
+        paymentReference: formData.get("paymentReference"),
+        adminNote: formData.get("adminNote"),
+        sendShippingEmail: true
+      });
+      orderEditorStatus.textContent = "已标记发货，并尝试发送邮件通知。";
+      await loadAdminDashboard(token);
+      setAdminTab("orders");
+      populateOrderEditor(adminOrders.find((order) => order.order_no === orderNo));
+    } catch (error) {
+      orderEditorStatus.textContent = error.message || "发货处理失败。";
+    }
+  });
+
+  productForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    productStatus.textContent = "正在保存商品...";
+    try {
+      const token = window.localStorage.getItem(tokenKey);
+      const formData = new FormData(productForm);
+      const id = formData.get("id");
+      const payload = {
+        name: formData.get("name"),
+        slug: formData.get("slug"),
+        subtitle: formData.get("subtitle"),
+        summary: formData.get("summary"),
+        priceUsd: Number(formData.get("priceUsd") || 0),
+        comparePriceUsd: formData.get("comparePriceUsd") || "",
+        sortOrder: Number(formData.get("sortOrder") || 0),
+        isActive: formData.get("isActive") === "true",
+        primaryImageUrl: formData.get("primaryImageUrl"),
+        description: formData.get("description"),
+        galleryImageUrls: String(formData.get("galleryImageUrls") || "").split("\n").map((item) => item.trim()).filter(Boolean)
+      };
+
+      const response = await fetch(`${API_BASE}/api/admin/products${id ? `/${id}` : ""}`, {
+        method: id ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          paymentStatus: formData.get("paymentStatus"),
-          orderStatus: "shipped",
-          shippingCarrier: formData.get("shippingCarrier"),
-          trackingNumber: formData.get("trackingNumber"),
-          trackingUrl: formData.get("trackingUrl"),
-          paymentReference: formData.get("paymentReference"),
-          adminNote: formData.get("adminNote"),
-          sendShippingEmail: true
-        })
+        body: JSON.stringify(payload)
       });
-
+      const data = await response.json();
       if (!response.ok) {
-        throw new Error("发货处理失败。");
+        throw new Error(data.error || "商品保存失败。");
       }
-
-      orderEditorStatus.textContent = "已标记发货，并尝试发送邮件通知。";
+      productStatus.textContent = "商品已保存。";
       await loadAdminDashboard(token);
-      populateOrderEditor(adminOrders.find((order) => order.order_no === orderNo));
-    } catch (_error) {
-      orderEditorStatus.textContent = "发货处理失败。";
+      setAdminTab("products");
+      populateProductForm(data.product);
+    } catch (error) {
+      productStatus.textContent = error.message || "商品保存失败。";
     }
   });
 
-  document.addEventListener("click", async (event) => {
-    const actionButton = event.target.closest("[data-action='select-order']");
-    if (!actionButton) {
+  productResetButton?.addEventListener("click", () => {
+    populateProductForm(null);
+    productStatus.textContent = "已切换到新建商品。";
+  });
+
+  productDeleteButton?.addEventListener("click", async () => {
+    const formData = new FormData(productForm);
+    const id = formData.get("id");
+    if (!id) {
+      productStatus.textContent = "请先选择要删除的商品。";
       return;
     }
 
-    const orderNo = actionButton.getAttribute("data-order-no");
-    const order = adminOrders.find((item) => item.order_no === orderNo);
-    if (order) {
-      populateOrderEditor(order);
+    const confirmed = window.confirm("确定要删除这个商品吗？删除后将无法恢复。");
+    if (!confirmed) {
+      return;
+    }
+
+    productStatus.textContent = "正在删除商品...";
+    try {
+      const token = window.localStorage.getItem(tokenKey);
+      const response = await fetch(`${API_BASE}/api/admin/products/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "删除商品失败。");
+      }
+      productStatus.textContent = "商品已删除。";
+      await loadAdminDashboard(token);
+      setAdminTab("products");
+      populateProductForm((adminProducts || [])[0] || null);
+    } catch (error) {
+      productStatus.textContent = error.message || "删除商品失败。";
     }
   });
 
-  logoutButton.addEventListener("click", () => {
+  document.addEventListener("click", (event) => {
+    const orderButton = event.target.closest("[data-action='select-order']");
+    if (orderButton) {
+      const order = adminOrders.find((item) => item.order_no === orderButton.dataset.orderNo);
+      if (order) {
+        populateOrderEditor(order);
+        setAdminTab("orders");
+      }
+      return;
+    }
+
+    const productButton = event.target.closest("[data-action='select-product']");
+    if (productButton) {
+      const product = adminProducts.find((item) => String(item.id) === productButton.dataset.productId);
+      if (product) {
+        populateProductForm(product);
+        setAdminTab("products");
+      }
+      return;
+    }
+
+    const deleteButton = event.target.closest("[data-action='delete-product']");
+    if (deleteButton) {
+      const product = adminProducts.find((item) => String(item.id) === deleteButton.dataset.productId);
+      if (product) {
+        populateProductForm(product);
+        setAdminTab("products");
+        productDeleteButton?.click();
+      }
+    }
+  });
+
+  logoutButton?.addEventListener("click", () => {
     window.localStorage.removeItem(tokenKey);
     window.location.reload();
   });
@@ -915,6 +1605,8 @@ async function initSite() {
   populateContactSections(settings);
   mountSiteContactPanel(settings);
   renderFloatingSupportWidget(settings);
+  await hydrateProductContent();
+  await trackEvent("page_view");
 }
 
 initSite();
@@ -922,4 +1614,14 @@ hydrateContacts();
 handleCheckoutForm();
 handleSuccessPage();
 handleAdminPage();
+
+document.addEventListener("click", (event) => {
+  const contactLink = event.target.closest("[data-contact-channel]");
+  if (!contactLink) {
+    return;
+  }
+
+  const channel = contactLink.getAttribute("data-contact-channel");
+  trackEvent("contact_click", { channel });
+});
 

@@ -8,6 +8,8 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 const settingsRouter = require("./routes/settings");
 const ordersRouter = require("./routes/orders");
 const adminRouter = require("./routes/admin");
+const productsRouter = require("./routes/products");
+const analyticsRouter = require("./routes/analytics");
 const { stripeWebhookHandler } = require("./routes/stripe");
 
 const app = express();
@@ -27,6 +29,8 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/settings", settingsRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/products", productsRouter);
+app.use("/api/analytics", analyticsRouter);
 
 app.get("/admin", (_req, res) => {
   res.sendFile(path.join(rootDir, "admin.html"));

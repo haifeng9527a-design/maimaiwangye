@@ -140,6 +140,19 @@
               <p class="card-kicker">Manual payment</p>
               <h3>当前付款说明</h3>
               <p id="manual-payment-text">请按后台设置的付款说明完成支付，并联系人工确认。</p>
+              <div class="manual-payment-details hidden" id="manual-payment-details">
+                <div class="manual-payment-meta hidden" id="manual-payment-meta">
+                  <span class="meta-label" id="manual-payment-meta-label">收款信息</span>
+                  <div class="manual-payment-value-row">
+                    <strong id="manual-payment-meta-value"></strong>
+                    <button class="button button-ghost small-button hidden" type="button" id="manual-payment-copy-button">复制</button>
+                  </div>
+                </div>
+                <div class="manual-payment-qr hidden" id="manual-payment-qr">
+                  <span class="meta-label">收款码</span>
+                  <img id="manual-payment-qr-image" alt="收款码">
+                </div>
+              </div>
             </div>
             <div class="checkout-actions">
               <button class="button button-primary" type="submit">提交订单并获取付款说明</button>
@@ -150,6 +163,15 @@
               <h3>选择一种方式联系客服付款</h3>
               <p>订单内容会自动带入聊天或邮件里，你只需要选择方便的方式继续。</p>
               <div class="contact-links" id="support-contact-options"></div>
+            </div>
+            <div class="glass-card support-choice-card hidden" id="crypto-verification-card">
+              <p class="card-kicker">USDT-TRC20 verification</p>
+              <h3>系统自动匹配到账</h3>
+              <p id="crypto-verification-description">请在规定时间内按当前唯一金额完成转账。系统会自动核对到账金额并确认订单。</p>
+              <div class="checkout-actions">
+                <button class="button button-primary" type="button" id="crypto-verify-button">立即检查到账</button>
+              </div>
+              <p class="form-status" id="crypto-verify-status" aria-live="polite"></p>
             </div>
             <p class="form-status" id="checkout-status" aria-live="polite"></p>
           </form>

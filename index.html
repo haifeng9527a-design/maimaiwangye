@@ -35,9 +35,9 @@
     <main>
       <section class="hero section">
         <div class="hero-copy reveal">
-          <p class="eyebrow">Ledger authorized reseller</p>
-          <h1>Ledger 授权现货，支持验货与新手指导。</h1>
-          <p class="hero-lead">
+          <p class="eyebrow" id="home-product-eyebrow">Ledger authorized reseller</p>
+          <h1 id="home-product-name">Ledger 授权现货，支持验货与新手指导。</h1>
+          <p class="hero-lead" id="home-product-subtitle">
             线上下单，线下门店同源供货。
             支持收货验封、开箱核对、首次使用指导，让第一次买硬钱包也能更放心。
           </p>
@@ -63,10 +63,10 @@
         <div class="hero-visual reveal">
           <div class="hero-media">
             <figure class="media-card media-card-main">
-              <img src="assets/images/ledger-hero.jpg" alt="Ledger 硬钱包产品主视觉">
+              <img id="home-product-primary-image" src="assets/images/ledger-hero.jpg" alt="Ledger 硬钱包产品主视觉">
             </figure>
             <figure class="media-card media-card-floating">
-              <img src="assets/images/ledger-side.jpg" alt="Ledger 硬钱包侧面细节图">
+              <img id="home-product-secondary-image" src="assets/images/ledger-side.jpg" alt="Ledger 硬钱包侧面细节图">
             </figure>
           </div>
         </div>
@@ -126,50 +126,20 @@
           <p class="eyebrow">How to buy</p>
           <h2>按购买需求选择更合适的方式</h2>
         </div>
-        <div class="product-grid">
-          <article class="product-card reveal">
-            <img class="card-thumb" src="assets/images/ledger-hero.jpg" alt="Ledger 官方产品展示图">
-            <p class="product-tag">现货购买</p>
-            <h3>官方产品现货</h3>
-            <p>适合已经明确要买 Ledger 的用户，重点是正品、发货时效和购买流程清楚。</p>
-            <div class="price-row">
-              <strong>支持咨询</strong>
-              <span>现货速发</span>
-            </div>
-            <ul class="bullet-list">
-              <li>实拍展示更直观</li>
-              <li>下单信息更清楚</li>
-              <li>适合直接咨询购买</li>
-            </ul>
-          </article>
+        <div class="product-grid" id="home-product-grid">
           <article class="product-card featured reveal">
-            <img class="card-thumb" src="assets/images/ledger-detail.png" alt="Ledger 细节展示图">
+            <img class="card-thumb" id="home-product-card-image" src="assets/images/ledger-detail.png" alt="产品展示图">
             <p class="product-tag">推荐购买</p>
-            <h3>授权经销交付</h3>
-            <p>从下单、发货到收货核对，都有更完整的说明和引导，第一次购买也不容易慌。</p>
+            <h3 id="home-product-card-name">授权经销交付</h3>
+            <p id="home-product-summary">从下单、发货到收货核对，都有更完整的说明和引导，第一次购买也不容易慌。</p>
             <div class="price-row">
-              <strong>更省心</strong>
-              <span>新手友好</span>
+              <strong id="home-product-price">$199</strong>
+              <span id="home-product-compare-price">现货速发</span>
             </div>
-            <ul class="bullet-list">
+            <ul class="bullet-list" id="home-product-bullets">
               <li>收货先看验货说明</li>
               <li>首次使用有基础提示</li>
               <li>适合第一次入手硬钱包</li>
-            </ul>
-          </article>
-          <article class="product-card reveal">
-            <img class="card-thumb" src="assets/images/ledger-side.jpg" alt="Ledger 侧面展示图">
-            <p class="product-tag">企业服务</p>
-            <h3>企业采购与送礼方案</h3>
-            <p>适合企业福利、活动礼赠和批量采购场景，支持统一对接、开票和集中交付。</p>
-            <div class="price-row">
-              <strong>支持询价</strong>
-              <span>批量交付</span>
-            </div>
-            <ul class="bullet-list">
-              <li>礼盒包材与定制卡片</li>
-              <li>批量发货与售后对接</li>
-              <li>适合活动和商务场景</li>
             </ul>
           </article>
         </div>
@@ -183,7 +153,7 @@
           <p class="eyebrow">Product gallery</p>
           <h2>产品实拍</h2>
         </div>
-        <div class="real-gallery">
+        <div class="real-gallery" id="home-product-gallery">
           <figure class="real-shot reveal">
             <img src="assets/images/ledger-hero.jpg" alt="Ledger 主视觉产品图片">
           </figure>

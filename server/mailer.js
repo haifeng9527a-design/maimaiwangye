@@ -58,7 +58,9 @@ function buildOrderConfirmationEmail(order, settings) {
   const subject = `订单已收到：${order.order_no}`;
   const manualHint = {
     stripe: "你选择的是 Stripe 在线支付，完成付款后系统会自动更新订单状态。",
-    crypto: settings.cryptoPaymentText || "你选择的是加密货币付款，请按站点说明联系确认收款地址。",
+    crypto: order.crypto_expected_amount
+      ? `你选择的是 USDT-TRC20 付款，请在 10 分钟内支付 ${Number(order.crypto_expected_amount).toFixed(3)} USDT，系统会自动匹配到账。`
+      : (settings.cryptoPaymentText || "你选择的是 USDT-TRC20 付款，请按站点说明完成付款。"),
     bank_transfer: settings.bankTransferText || "你选择的是银行转账，请按站点说明完成付款并联系确认。",
     wechat_pay: settings.wechatPaymentText || "你选择的是微信付款，请联系客服获取收款信息。",
     alipay: settings.alipayPaymentText || "你选择的是支付宝付款，请联系客服获取收款信息。"
@@ -75,6 +77,7 @@ function buildOrderConfirmationEmail(order, settings) {
         <li>数量：${order.quantity}</li>
         <li>付款方式：${order.payment_method}</li>
         <li>支付状态：${order.payment_status}</li>
+        ${order.payment_method === "crypto" && order.crypto_expected_amount ? `<li>应付金额：${Number(order.crypto_expected_amount).toFixed(3)} USDT</li>` : ""}
       </ul>
       <p>${manualHint}</p>
       <p>如需帮助，可通过站点客服联系我们。</p>
@@ -179,9 +182,41 @@ function buildShippingEmail(order) {
   return { subject, html, text };
 }
 
+function buildPaymentConfirmedEmail(order) {
+  const subject = `付款已确认：${order.order_no}`;
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827;">
+      <h2>付款已确认</h2>
+      <p>你好，${order.customer_name}：</p>
+      <p>我们已经确认收到你的付款，订单正在安排处理中。</p>
+      <ul>
+        <li>订单号：${order.order_no}</li>
+        <li>产品：${order.product_name}</li>
+        <li>数量：${order.quantity}</li>
+        <li>支付状态：${order.payment_status}</li>
+        <li>订单状态：${order.order_status}</li>
+      </ul>
+      <p>商家正在准备发货，请留意后续通知邮件。</p>
+    </div>
+  `;
+
+  const text = [
+    "付款已确认",
+    `订单号：${order.order_no}`,
+    `产品：${order.product_name}`,
+    `数量：${order.quantity}`,
+    `支付状态：${order.payment_status}`,
+    `订单状态：${order.order_status}`,
+    "商家正在准备发货，请留意后续通知邮件。"
+  ].join("\n");
+
+  return { subject, html, text };
+}
+
 module.exports = {
   sendMail,
   buildOrderConfirmationEmail,
   buildShippingEmail,
-  buildSupportOrderAlertEmail
+  buildSupportOrderAlertEmail,
+  buildPaymentConfirmedEmail
 };

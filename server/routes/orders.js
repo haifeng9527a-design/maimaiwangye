@@ -2,10 +2,12 @@ const express = require("express");
 const Stripe = require("stripe");
 const db = require("../db");
 const { createOrderNumber, requireEnv } = require("../utils");
+const { formatUsdtAmount, findMatchingIncomingUsdtPayment } = require("../crypto");
 const {
   sendMail,
   buildOrderConfirmationEmail,
-  buildSupportOrderAlertEmail
+  buildSupportOrderAlertEmail,
+  buildPaymentConfirmedEmail
 } = require("../mailer");
 
 const router = express.Router();
@@ -21,10 +23,47 @@ function getStripeClient() {
 function getManualPaymentInstructions(settings, paymentMethod) {
   return {
     bank_transfer: settings.bankTransferText || "请联系客服获取银行转账收款信息。",
-    crypto: settings.cryptoPaymentText || "请联系客服获取加密货币收款地址。",
+    crypto: settings.cryptoPaymentText || "请使用 USDT-TRC20 地址完成付款，付款后提交 TXID 自动核单。",
     wechat_pay: settings.wechatPaymentText || "请联系客服获取微信付款方式。",
     alipay: settings.alipayPaymentText || "请联系客服获取支付宝付款方式。"
   }[paymentMethod] || "";
+}
+
+function buildCryptoPaymentWindow() {
+  const now = Date.now();
+  const expiresAt = new Date(now + (10 * 60 * 1000)).toISOString();
+  return { now, expiresAt };
+}
+
+function buildUniqueUsdtAmount(amountCents, orderNo) {
+  const baseAmount = Number(amountCents || 0) / 100;
+  const numericPart = String(orderNo || "").replace(/[^\d]/g, "");
+  const suffix = Number(numericPart.slice(-3) || "0") / 1000;
+  return Number((baseAmount + suffix).toFixed(3));
+}
+
+async function sendPaymentConfirmedEmailIfNeeded(orderNo, order) {
+  if (!order?.email || order?.payment_confirmed_email_sent) {
+    return order;
+  }
+
+  try {
+    const emailPayload = buildPaymentConfirmedEmail(order);
+    const result = await sendMail({
+      to: order.email,
+      ...emailPayload
+    });
+
+    if (!result.skipped) {
+      return await db.updateOrderByNo(orderNo, {
+        payment_confirmed_email_sent: true
+      });
+    }
+  } catch (_error) {
+    return order;
+  }
+
+  return order;
 }
 
 function formatPaymentMethodLabel(method) {
@@ -156,9 +195,10 @@ router.post("/", async (req, res) => {
     region = "",
     postalCode = "",
     productName = "Ledger",
+    productSlug = "",
     quantity = 1,
     remark = "",
-    amountCents = 19900,
+    amountCents = 0,
     currency = "usd",
     paymentMethod = "stripe"
   } = req.body || {};
@@ -172,9 +212,26 @@ router.post("/", async (req, res) => {
   const stripe = getStripeClient();
 
   try {
-    const settings = await db.getSettings();
+    const [settings, product] = await Promise.all([
+      db.getSettings(),
+      productSlug ? db.getProductBySlug(productSlug) : null
+    ]);
+
+    const resolvedProductName = product?.name || productName;
+    const resolvedAmountCents = product
+      ? Math.round(Number(product.price_usd || 0) * 100) * Math.max(Number(quantity || 1), 1)
+      : amountCents;
+
+    if (!resolvedProductName || !resolvedAmountCents) {
+      return res.status(400).json({ error: "商品信息无效，请刷新页面后重试。" });
+    }
+
     const normalizedPaymentMethod = String(paymentMethod || "stripe");
     const initialPaymentStatus = normalizedPaymentMethod === "stripe" ? "pending" : "manual_review";
+    const cryptoPaymentWindow = normalizedPaymentMethod === "crypto" ? buildCryptoPaymentWindow() : null;
+    const cryptoExpectedAmount = normalizedPaymentMethod === "crypto"
+      ? buildUniqueUsdtAmount(resolvedAmountCents, orderNo)
+      : null;
     const createdOrder = await db.createOrder({
       order_no: orderNo,
       customer_name: customerName,
@@ -186,13 +243,13 @@ router.post("/", async (req, res) => {
       city,
       region,
       postal_code: postalCode,
-      product_name: productName,
+      product_name: resolvedProductName,
       quantity,
       remark,
       payment_method: normalizedPaymentMethod,
       payment_status: initialPaymentStatus,
       order_status: "pending",
-      amount_cents: amountCents,
+      amount_cents: resolvedAmountCents,
       currency,
       stripe_session_id: "",
       payment_reference: "",
@@ -201,7 +258,12 @@ router.post("/", async (req, res) => {
       tracking_url: "",
       admin_note: "",
       notification_email_sent: false,
-      shipping_email_sent: false
+      shipping_email_sent: false,
+      crypto_txid: "",
+      crypto_verified_at: null,
+      crypto_expected_amount: cryptoExpectedAmount,
+      crypto_payment_expires_at: cryptoPaymentWindow?.expiresAt || null,
+      payment_confirmed_email_sent: false
     });
 
     let notificationEmailSent = false;
@@ -243,7 +305,11 @@ router.post("/", async (req, res) => {
         paymentUrl: null,
         manualPaymentInstructions: getManualPaymentInstructions(settings, normalizedPaymentMethod),
         supportContacts,
-        message: "订单已创建，订单信息已同步给客服，请立即选择一种方式联系客服获取付款方式并完成支付。"
+        cryptoExpectedAmount,
+        cryptoPaymentExpiresAt: cryptoPaymentWindow?.expiresAt || null,
+        message: normalizedPaymentMethod === "crypto"
+          ? `订单已创建，请在 10 分钟内支付 ${formatUsdtAmount(cryptoExpectedAmount, 3)} USDT，系统会自动核对到账。`
+          : "订单已创建，订单信息已同步给客服，请立即选择一种方式联系客服获取付款方式并完成支付。"
       });
     }
 
@@ -266,9 +332,9 @@ router.post("/", async (req, res) => {
           price_data: {
             currency,
             product_data: {
-              name: productName
+              name: resolvedProductName
             },
-            unit_amount: amountCents
+            unit_amount: Math.round(Number(product?.price_usd || (resolvedAmountCents / Math.max(Number(quantity || 1), 1) / 100)) * 100)
           },
           quantity
         }
@@ -341,6 +407,74 @@ router.post("/confirm-session", async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       error: "支付状态确认失败。",
+      detail: error.message
+    });
+  }
+});
+
+router.post("/:orderNo/verify-crypto", async (req, res) => {
+  const { orderNo } = req.params;
+
+  try {
+    const [order, settings] = await Promise.all([
+      db.getOrderByNo(orderNo),
+      db.getSettings()
+    ]);
+
+    if (!order) {
+      return res.status(404).json({ error: "订单不存在。" });
+    }
+
+    if (order.payment_method !== "crypto") {
+      return res.status(400).json({ error: "当前订单不是加密货币付款订单。" });
+    }
+
+    if (order.payment_status === "paid") {
+      return res.json({
+        order,
+        message: "该订单已确认付款，商家正在处理中。"
+      });
+    }
+
+    const expiresAt = order.crypto_payment_expires_at ? new Date(order.crypto_payment_expires_at).getTime() : 0;
+    const createdAt = order.created_at ? new Date(order.created_at).getTime() : Date.now();
+    const minTimestamp = createdAt;
+    const maxTimestamp = expiresAt || (createdAt + 10 * 60 * 1000);
+
+    if (Date.now() > maxTimestamp) {
+      return res.status(400).json({ error: "该订单的 USDT 支付时间窗口已过，请重新下单或联系客服处理。" });
+    }
+
+    const verification = await findMatchingIncomingUsdtPayment({
+      receiverAddress: settings.crypto_wallet_address,
+      expectedAmount: Number(order.crypto_expected_amount || 0),
+      minTimestamp,
+      maxTimestamp,
+      excludeTxids: []
+    });
+
+    if (!verification.matched) {
+      return res.status(400).json({ error: verification.detail });
+    }
+
+    let updatedOrder = await db.updateOrderByNo(orderNo, {
+      payment_status: "paid",
+      order_status: "confirmed",
+      payment_reference: verification.txid,
+      crypto_txid: verification.txid,
+      crypto_verified_at: new Date().toISOString(),
+      admin_note: [order.admin_note, `USDT-TRC20 唯一金额自动核单成功：${verification.detail}`].filter(Boolean).join("\n")
+    });
+
+    updatedOrder = await sendPaymentConfirmedEmailIfNeeded(orderNo, updatedOrder);
+
+    return res.json({
+      order: updatedOrder,
+      message: "付款已确认，商家正在准备发货。"
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "自动核单失败。",
       detail: error.message
     });
   }

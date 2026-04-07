@@ -16,7 +16,7 @@
     <div class="ambient ambient-two"></div>
     <main class="admin-page">
       <section class="admin-login glass-card" id="admin-login-panel">
-        <p class="eyebrow">Admin login</p>
+        <p class="eyebrow">后台登录</p>
         <h1>后台登录</h1>
         <form id="admin-login-form" class="stack-form">
           <label>
@@ -35,15 +35,294 @@
       <section class="admin-dashboard hidden" id="admin-dashboard">
         <div class="admin-header">
           <div>
-            <p class="eyebrow">Admin panel</p>
-            <h1>订单与联系方式管理</h1>
+            <p class="eyebrow">运营后台</p>
+            <h1>运营后台</h1>
+            <p class="hero-lead">查看访问统计、客服线索、订单履约、商品配置与站点设置。</p>
           </div>
           <button class="button button-ghost" id="admin-logout" type="button">退出登录</button>
         </div>
 
-        <div class="admin-grid">
+        <nav class="admin-tabs" id="admin-tabs">
+          <button class="admin-tab is-active" type="button" data-admin-tab="dashboard">仪表盘</button>
+          <button class="admin-tab" type="button" data-admin-tab="orders">订单</button>
+          <button class="admin-tab" type="button" data-admin-tab="leads">线索</button>
+          <button class="admin-tab" type="button" data-admin-tab="products">商品</button>
+          <button class="admin-tab" type="button" data-admin-tab="settings">配置</button>
+        </nav>
+
+        <section class="admin-panel is-active" data-admin-panel="dashboard">
+          <div class="admin-metrics" id="admin-metrics">
+            <article class="glass-card admin-metric-card">
+              <span>今日访问</span>
+              <strong id="metric-visits-today">0</strong>
+            </article>
+            <article class="glass-card admin-metric-card">
+              <span>今日访客</span>
+              <strong id="metric-unique-visitors">0</strong>
+            </article>
+            <article class="glass-card admin-metric-card">
+              <span>7日订单</span>
+              <strong id="metric-recent-orders">0</strong>
+            </article>
+            <article class="glass-card admin-metric-card">
+              <span>待付款</span>
+              <strong id="metric-pending-payment">0</strong>
+            </article>
+            <article class="glass-card admin-metric-card">
+              <span>待发货</span>
+              <strong id="metric-pending-shipment">0</strong>
+            </article>
+            <article class="glass-card admin-metric-card">
+              <span>已发货</span>
+              <strong id="metric-shipped">0</strong>
+            </article>
+          </div>
+
+          <div class="admin-grid">
+            <section class="glass-card admin-section">
+              <h2>热门页面</h2>
+              <div class="admin-list" id="top-pages-list"></div>
+            </section>
+            <section class="glass-card admin-section">
+              <h2>访问来源</h2>
+              <div class="admin-list" id="top-sources-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="admin-panel" data-admin-panel="orders">
           <section class="glass-card admin-section">
-            <h2>站点联系方式</h2>
+            <div class="admin-section-head">
+              <h2>订单列表</h2>
+              <div class="admin-filter-row">
+                <select id="order-payment-filter">
+                  <option value="">全部支付状态</option>
+                  <option value="pending">待付款</option>
+                  <option value="paid">已付款</option>
+                  <option value="manual_review">人工确认中</option>
+                  <option value="cancelled">已取消</option>
+                </select>
+                <select id="order-status-filter">
+                  <option value="">全部订单状态</option>
+                  <option value="pending">待处理</option>
+                  <option value="confirmed">已确认</option>
+                  <option value="processing">处理中</option>
+                  <option value="shipped">已发货</option>
+                  <option value="completed">已完成</option>
+                  <option value="cancelled">已取消</option>
+                </select>
+              </div>
+            </div>
+            <div class="orders-table-wrapper">
+              <table class="orders-table">
+                <thead>
+                  <tr>
+                    <th>订单号</th>
+                    <th>客户</th>
+                    <th>产品</th>
+                    <th>付款方式</th>
+                    <th>支付状态</th>
+                    <th>订单状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="orders-table-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="glass-card admin-section">
+            <h2>订单处理</h2>
+            <form id="order-editor-form" class="settings-form">
+            <div class="form-row">
+              <label>
+                <span>订单号</span>
+                <input type="text" name="orderNo" readonly>
+              </label>
+              <label>
+                <span>客户邮箱</span>
+                <input type="text" name="email" readonly>
+              </label>
+            </div>
+            <div class="form-row">
+              <label>
+                <span>支付状态</span>
+                <select name="paymentStatus">
+                  <option value="pending">待付款</option>
+                  <option value="paid">已付款</option>
+                  <option value="manual_review">人工确认中</option>
+                  <option value="cancelled">已取消</option>
+                </select>
+              </label>
+              <label>
+                <span>订单状态</span>
+                <select name="orderStatus">
+                  <option value="pending">待处理</option>
+                  <option value="confirmed">已确认</option>
+                  <option value="processing">处理中</option>
+                  <option value="shipped">已发货</option>
+                  <option value="completed">已完成</option>
+                  <option value="cancelled">已取消</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-row">
+              <label>
+                <span>物流公司</span>
+                <input type="text" name="shippingCarrier" placeholder="如 DHL / FedEx / 顺丰">
+              </label>
+              <label>
+                <span>运单号</span>
+                <input type="text" name="trackingNumber" placeholder="填写物流单号">
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="full-width">
+                <span>物流查询链接</span>
+                <input type="text" name="trackingUrl" placeholder="填写完整查询链接">
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="full-width">
+                <span>支付参考 / 人工收款备注</span>
+                <input type="text" name="paymentReference" placeholder="如转账尾号、链上哈希、客服确认备注">
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="full-width">
+                <span>后台备注</span>
+                <textarea name="adminNote" rows="3" placeholder="内部处理备注，不对外展示"></textarea>
+              </label>
+            </div>
+            <div class="checkout-actions">
+              <button class="button button-primary" type="submit">保存订单处理信息</button>
+              <button class="button button-secondary" id="mark-shipped-button" type="button">标记已发货并发送通知</button>
+            </div>
+            <p class="form-status" id="order-editor-status" aria-live="polite"></p>
+            </form>
+          </section>
+        </section>
+
+        <section class="admin-panel" data-admin-panel="leads">
+          <section class="glass-card admin-section">
+            <h2>客服线索</h2>
+            <div class="orders-table-wrapper">
+              <table class="orders-table">
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>渠道</th>
+                    <th>页面</th>
+                    <th>订单号</th>
+                    <th>客户信息</th>
+                  </tr>
+                </thead>
+                <tbody id="contact-events-table-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="admin-panel" data-admin-panel="products">
+          <div class="admin-grid">
+            <section class="glass-card admin-section">
+              <h2>商品列表</h2>
+              <div class="orders-table-wrapper">
+                <table class="orders-table">
+                  <thead>
+                    <tr>
+                      <th>名称</th>
+                      <th>链接标识</th>
+                      <th>价格</th>
+                      <th>状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="products-table-body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="glass-card admin-section">
+              <h2>商品编辑</h2>
+              <form id="product-form" class="settings-form">
+                <input type="hidden" name="id">
+                <div class="form-row">
+                  <label>
+                    <span>商品名称</span>
+                    <input type="text" name="name" required>
+                  </label>
+                  <label>
+                    <span>链接标识</span>
+                    <input type="text" name="slug" required>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    <span>副标题</span>
+                    <input type="text" name="subtitle">
+                  </label>
+                  <label>
+                    <span>摘要</span>
+                    <input type="text" name="summary">
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    <span>价格（USD）</span>
+                    <input type="number" step="0.01" min="0" name="priceUsd" required>
+                  </label>
+                  <label>
+                    <span>原价（前台划线显示）</span>
+                    <input type="number" step="0.01" min="0" name="comparePriceUsd">
+                  </label>
+                </div>
+                <p class="muted-copy">说明：如果填写“原价”，前台会把它显示成划掉的参考原价；不填就只显示当前售价。</p>
+                <div class="form-row">
+                  <label>
+                    <span>排序</span>
+                    <input type="number" min="0" name="sortOrder" value="1">
+                  </label>
+                  <label>
+                    <span>是否上架</span>
+                    <select name="isActive">
+                      <option value="true">上架</option>
+                      <option value="false">下架</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label class="full-width">
+                    <span>主图 URL</span>
+                    <input type="text" name="primaryImageUrl">
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label class="full-width">
+                    <span>详情描述</span>
+                    <textarea name="description" rows="4"></textarea>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label class="full-width">
+                    <span>图集 URL 列表（每行一个）</span>
+                    <textarea name="galleryImageUrls" rows="5"></textarea>
+                  </label>
+                </div>
+                <div class="checkout-actions">
+                  <button class="button button-primary" type="submit">保存商品</button>
+                  <button class="button button-secondary" id="product-reset-button" type="button">新建商品</button>
+                  <button class="button button-ghost" id="product-delete-button" type="button">删除当前商品</button>
+                </div>
+                <p class="form-status" id="product-status" aria-live="polite"></p>
+              </form>
+            </section>
+          </div>
+        </section>
+
+        <section class="admin-panel" data-admin-panel="settings">
+          <section class="glass-card admin-section">
+            <h2>站点配置</h2>
             <form id="settings-form" class="settings-form">
               <div class="form-row">
                 <label>
@@ -87,11 +366,11 @@
               </div>
               <div class="form-row">
                 <label>
-                  <span>Stripe Publishable Key</span>
+                  <span>Stripe 公钥</span>
                   <input type="text" name="stripePublishableKey">
                 </label>
                 <label>
-                  <span>Stripe Price ID</span>
+                  <span>Stripe 价格 ID</span>
                   <input type="text" name="stripePriceId">
                 </label>
               </div>
@@ -114,9 +393,25 @@
                 </label>
               </div>
               <div class="form-row">
+                <label>
+                  <span>USDT 收款地址</span>
+                  <input type="text" name="cryptoWalletAddress" placeholder="填写 USDT 收款地址">
+                </label>
+                <label>
+                  <span>USDT 收款码图片链接</span>
+                  <input type="text" name="cryptoQrCodeUrl" placeholder="填写二维码图片 URL">
+                </label>
+              </div>
+              <div class="form-row">
                 <label class="full-width">
                   <span>微信付款说明</span>
                   <textarea name="wechatPaymentText" rows="3" placeholder="填写微信付款说明、二维码备注或联系客服提示"></textarea>
+                </label>
+              </div>
+              <div class="form-row">
+                <label class="full-width">
+                  <span>微信收款码图片链接</span>
+                  <input type="text" name="wechatQrCodeUrl" placeholder="填写微信收款码图片 URL">
                 </label>
               </div>
               <div class="form-row">
@@ -125,101 +420,16 @@
                   <textarea name="alipayPaymentText" rows="3" placeholder="填写支付宝付款说明或客服引导"></textarea>
                 </label>
               </div>
+              <div class="form-row">
+                <label class="full-width">
+                  <span>支付宝收款码图片链接</span>
+                  <input type="text" name="alipayQrCodeUrl" placeholder="填写支付宝收款码图片 URL">
+                </label>
+              </div>
               <button class="button button-primary" type="submit">保存设置</button>
               <p class="form-status" id="settings-status" aria-live="polite"></p>
             </form>
           </section>
-
-          <section class="glass-card admin-section">
-            <h2>订单列表</h2>
-            <div class="orders-table-wrapper">
-              <table class="orders-table">
-                <thead>
-                  <tr>
-                    <th>订单号</th>
-                    <th>客户</th>
-                    <th>产品</th>
-                    <th>付款方式</th>
-                    <th>支付状态</th>
-                    <th>订单状态</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody id="orders-table-body"></tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-
-        <section class="glass-card admin-section">
-          <h2>订单处理</h2>
-          <form id="order-editor-form" class="settings-form">
-            <div class="form-row">
-              <label>
-                <span>订单号</span>
-                <input type="text" name="orderNo" readonly>
-              </label>
-              <label>
-                <span>客户邮箱</span>
-                <input type="text" name="email" readonly>
-              </label>
-            </div>
-            <div class="form-row">
-              <label>
-                <span>支付状态</span>
-                <select name="paymentStatus">
-                  <option value="pending">pending</option>
-                  <option value="paid">paid</option>
-                  <option value="manual_review">manual_review</option>
-                  <option value="cancelled">cancelled</option>
-                </select>
-              </label>
-              <label>
-                <span>订单状态</span>
-                <select name="orderStatus">
-                  <option value="pending">pending</option>
-                  <option value="confirmed">confirmed</option>
-                  <option value="processing">processing</option>
-                  <option value="shipped">shipped</option>
-                  <option value="completed">completed</option>
-                  <option value="cancelled">cancelled</option>
-                </select>
-              </label>
-            </div>
-            <div class="form-row">
-              <label>
-                <span>物流公司</span>
-                <input type="text" name="shippingCarrier" placeholder="如 DHL / FedEx / 顺丰">
-              </label>
-              <label>
-                <span>运单号</span>
-                <input type="text" name="trackingNumber" placeholder="填写物流单号">
-              </label>
-            </div>
-            <div class="form-row">
-              <label class="full-width">
-                <span>物流查询链接</span>
-                <input type="text" name="trackingUrl" placeholder="填写完整查询链接">
-              </label>
-            </div>
-            <div class="form-row">
-              <label class="full-width">
-                <span>支付参考 / 人工收款备注</span>
-                <input type="text" name="paymentReference" placeholder="如转账尾号、链上哈希、客服确认备注">
-              </label>
-            </div>
-            <div class="form-row">
-              <label class="full-width">
-                <span>后台备注</span>
-                <textarea name="adminNote" rows="3" placeholder="内部处理备注，不对外展示"></textarea>
-              </label>
-            </div>
-            <div class="checkout-actions">
-              <button class="button button-primary" type="submit">保存订单处理信息</button>
-              <button class="button button-secondary" id="mark-shipped-button" type="button">标记已发货并发送通知</button>
-            </div>
-            <p class="form-status" id="order-editor-status" aria-live="polite"></p>
-          </form>
         </section>
       </section>
     </main>

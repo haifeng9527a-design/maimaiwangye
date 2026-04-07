@@ -35,17 +35,17 @@
     <main>
       <section class="hero section page-hero">
         <div class="hero-copy reveal">
-          <p class="eyebrow">Ledger product details</p>
-          <h1>实拍、包装、收货检查，一次看清楚</h1>
-          <p class="hero-lead">
+          <p class="eyebrow" id="product-page-eyebrow">Ledger product details</p>
+          <h1 id="product-page-name">实拍、包装、收货检查，一次看清楚</h1>
+          <p class="hero-lead" id="product-page-subtitle">
             下单前先看真实产品图、包装内容和收货后建议核对的项目。
             第一次购买，也能先把重要信息看明白再决定。
           </p>
         </div>
         <div class="hero-side-card glass-card reveal">
           <p class="card-kicker">Authorized stock</p>
-          <strong>授权现货</strong>
-          <p>支持咨询、下单、发货与基础售后说明。</p>
+          <strong id="product-page-side-name">授权现货</strong>
+          <p id="product-page-summary">支持咨询、下单、发货与基础售后说明。</p>
           <div class="stat-row">
             <span>发货时效</span>
             <strong>48 小时内</strong>
@@ -60,16 +60,35 @@
       <section class="section">
         <div class="showcase-grid">
           <figure class="showcase-main glass-card reveal">
-            <img src="assets/images/ledger-hero.jpg" alt="Ledger 硬钱包主展示图">
+              <img id="product-page-primary-image" src="assets/images/ledger-hero.jpg" alt="Ledger 硬钱包主展示图">
           </figure>
           <div class="showcase-side">
             <figure class="real-shot glass-card reveal">
-              <img src="assets/images/ledger-side.jpg" alt="Ledger 侧面产品图">
+              <img id="product-page-gallery-image-1" src="assets/images/ledger-side.jpg" alt="Ledger 侧面产品图">
             </figure>
             <figure class="real-shot glass-card reveal">
-              <img src="assets/images/ledger-detail.png" alt="Ledger 细节图">
+              <img id="product-page-gallery-image-2" src="assets/images/ledger-detail.png" alt="Ledger 细节图">
             </figure>
           </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading reveal">
+          <p class="eyebrow">Model lineup</p>
+          <h2>在售型号</h2>
+        </div>
+        <div class="product-grid" id="product-model-grid">
+          <article class="product-card featured reveal">
+            <img class="card-thumb" src="assets/images/ledger-hero.jpg" alt="Ledger 型号展示图">
+            <p class="product-tag">热门型号</p>
+            <h3>Ledger Nano X</h3>
+            <p>支持现货下单、收货验货与新手使用引导。</p>
+            <div class="price-row">
+              <strong>$199</strong>
+              <span>下单页选择型号</span>
+            </div>
+          </article>
         </div>
       </section>
 
@@ -81,11 +100,11 @@
         <div class="packaging-stack">
           <article class="variant-display reveal">
             <p class="eyebrow">Official box</p>
-            <h3>官方零售盒</h3>
-            <p>产品采用官方零售盒包装，到手后可以先核对产品外观、型号信息和盒内配件。</p>
+            <h3 id="product-page-detail-name">官方零售盒</h3>
+            <p id="product-page-description">产品采用官方零售盒包装，到手后可以先核对产品外观、型号信息和盒内配件。</p>
             <div class="price-box">
-              <span>包装类型</span>
-              <strong>官方零售包装</strong>
+              <span>当前价格</span>
+              <strong id="product-page-price">$199</strong>
             </div>
             <ul class="bullet-list">
               <li>产品型号和外观信息清晰可见</li>
