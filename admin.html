@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COLDARC | 后台管理</title>
+  <meta name="description" content="订单管理、联系方式管理与站点设置后台。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="admin">
+  <div class="site-shell">
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <main class="admin-page">
+      <section class="admin-login glass-card" id="admin-login-panel">
+        <p class="eyebrow">Admin login</p>
+        <h1>后台登录</h1>
+        <form id="admin-login-form" class="stack-form">
+          <label>
+            <span>用户名</span>
+            <input type="text" name="username" placeholder="请输入管理员账号" required>
+          </label>
+          <label>
+            <span>密码</span>
+            <input type="password" name="password" placeholder="请输入管理员密码" required>
+          </label>
+          <button class="button button-primary" type="submit">登录后台</button>
+          <p class="form-status" id="admin-login-status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="admin-dashboard hidden" id="admin-dashboard">
+        <div class="admin-header">
+          <div>
+            <p class="eyebrow">Admin panel</p>
+            <h1>订单与联系方式管理</h1>
+          </div>
+          <button class="button button-ghost" id="admin-logout" type="button">退出登录</button>
+        </div>
+
+        <div class="admin-grid">
+          <section class="glass-card admin-section">
+            <h2>站点联系方式</h2>
+            <form id="settings-form" class="settings-form">
+              <div class="form-row">
+                <label>
+                  <span>站点名称</span>
+                  <input type="text" name="siteName">
+                </label>
+                <label>
+                  <span>支持文案</span>
+                  <input type="text" name="supportText">
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  <span>WhatsApp</span>
+                  <input type="text" name="whatsapp" placeholder="可直接填手机号，如 +66 93 026 0980">
+                </label>
+                <label>
+                  <span>Telegram</span>
+                  <input type="text" name="telegram" placeholder="可直接填 @用户名，如 @ll767689">
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  <span>微信</span>
+                  <input type="text" name="wechat" placeholder="填写微信号或客服备注">
+                </label>
+                <label>
+                  <span>邮箱</span>
+                  <input type="email" name="email" placeholder="填写客服邮箱">
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  <span>手机号</span>
+                  <input type="text" name="phone" placeholder="填写可拨打手机号">
+                </label>
+                <label>
+                  <span>Instagram</span>
+                  <input type="text" name="instagram" placeholder="可填 @用户名或完整链接">
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  <span>Stripe Publishable Key</span>
+                  <input type="text" name="stripePublishableKey">
+                </label>
+                <label>
+                  <span>Stripe Price ID</span>
+                  <input type="text" name="stripePriceId">
+                </label>
+              </div>
+              <div class="form-row">
+                <label class="full-width">
+                  <span>下单提示</span>
+                  <textarea name="checkoutNotice" rows="3"></textarea>
+                </label>
+              </div>
+              <div class="form-row">
+                <label class="full-width">
+                  <span>银行卡转账说明</span>
+                  <textarea name="bankTransferText" rows="3"></textarea>
+                </label>
+              </div>
+              <div class="form-row">
+                <label class="full-width">
+                  <span>加密货币收款说明</span>
+                  <textarea name="cryptoPaymentText" rows="3"></textarea>
+                </label>
+              </div>
+              <div class="form-row">
+                <label class="full-width">
+                  <span>微信付款说明</span>
+                  <textarea name="wechatPaymentText" rows="3" placeholder="填写微信付款说明、二维码备注或联系客服提示"></textarea>
+                </label>
+              </div>
+              <div class="form-row">
+                <label class="full-width">
+                  <span>支付宝付款说明</span>
+                  <textarea name="alipayPaymentText" rows="3" placeholder="填写支付宝付款说明或客服引导"></textarea>
+                </label>
+              </div>
+              <button class="button button-primary" type="submit">保存设置</button>
+              <p class="form-status" id="settings-status" aria-live="polite"></p>
+            </form>
+          </section>
+
+          <section class="glass-card admin-section">
+            <h2>订单列表</h2>
+            <div class="orders-table-wrapper">
+              <table class="orders-table">
+                <thead>
+                  <tr>
+                    <th>订单号</th>
+                    <th>客户</th>
+                    <th>产品</th>
+                    <th>付款方式</th>
+                    <th>支付状态</th>
+                    <th>订单状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="orders-table-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <section class="glass-card admin-section">
+          <h2>订单处理</h2>
+          <form id="order-editor-form" class="settings-form">
+            <div class="form-row">
+              <label>
+                <span>订单号</span>
+                <input type="text" name="orderNo" readonly>
+              </label>
+              <label>
+                <span>客户邮箱</span>
+                <input type="text" name="email" readonly>
+              </label>
+            </div>
+            <div class="form-row">
+              <label>
+                <span>支付状态</span>
+                <select name="paymentStatus">
+                  <option value="pending">pending</option>
+                  <option value="paid">paid</option>
+                  <option value="manual_review">manual_review</option>
+                  <option value="cancelled">cancelled</option>
+                </select>
+              </label>
+              <label>
+                <span>订单状态</span>
+                <select name="orderStatus">
+                  <option value="pending">pending</option>
+                  <option value="confirmed">confirmed</option>
+                  <option value="processing">processing</option>
+                  <option value="shipped">shipped</option>
+                  <option value="completed">completed</option>
+                  <option value="cancelled">cancelled</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-row">
+              <label>
+                <span>物流公司</span>
+                <input type="text" name="shippingCarrier" placeholder="如 DHL / FedEx / 顺丰">
+              </label>
+              <label>
+                <span>运单号</span>
+                <input type="text" name="trackingNumber" placeholder="填写物流单号">
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="full-width">
+                <span>物流查询链接</span>
+                <input type="text" name="trackingUrl" placeholder="填写完整查询链接">
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="full-width">
+                <span>支付参考 / 人工收款备注</span>
+                <input type="text" name="paymentReference" placeholder="如转账尾号、链上哈希、客服确认备注">
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="full-width">
+                <span>后台备注</span>
+                <textarea name="adminNote" rows="3" placeholder="内部处理备注，不对外展示"></textarea>
+              </label>
+            </div>
+            <div class="checkout-actions">
+              <button class="button button-primary" type="submit">保存订单处理信息</button>
+              <button class="button button-secondary" id="mark-shipped-button" type="button">标记已发货并发送通知</button>
+            </div>
+            <p class="form-status" id="order-editor-status" aria-live="polite"></p>
+          </form>
+        </section>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

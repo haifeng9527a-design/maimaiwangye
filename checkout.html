@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COLDARC | 提交订单</title>
+  <meta name="description" content="填写收货信息并提交 Ledger 订单，支持在线支付与客服联系。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="checkout">
+  <div class="site-shell">
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <header class="site-header">
+      <a class="brand" href="index.html" aria-label="COLDARC 首页">
+        <span class="brand-mark"></span>
+        <span class="brand-text">COLDARC</span>
+      </a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">
+        <span></span>
+        <span></span>
+      </button>
+      <nav class="site-nav" id="site-nav">
+        <a href="index.html">首页</a>
+        <a href="product.html">产品详情</a>
+        <a href="guide.html">新手指南</a>
+        <a href="story.html">品牌故事</a>
+      </nav>
+      <a class="button button-ghost header-cta" href="product.html">返回产品页</a>
+    </header>
+
+    <main>
+      <section class="hero section page-hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Checkout</p>
+          <h1>填写订单信息</h1>
+          <p class="hero-lead">请确认产品型号、联系方式和收货地址。提交后将跳转到支付页面。</p>
+        </div>
+        <div class="hero-side-card glass-card">
+          <p class="card-kicker">Order notes</p>
+          <strong>现货订单默认 48 小时内发出</strong>
+          <p id="checkout-notice-text">下单前请确认产品型号、联系方式与收货地址。</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="checkout-layout">
+          <form class="checkout-form glass-card" id="checkout-form">
+            <div class="form-row">
+              <label>
+                <span>产品名称</span>
+                <select name="productName" required>
+                  <option value="Ledger Nano X">Ledger Nano X</option>
+                  <option value="Ledger Nano S Plus">Ledger Nano S Plus</option>
+                </select>
+              </label>
+              <label>
+                <span>数量</span>
+                <input type="number" name="quantity" min="1" value="1" required>
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="full-width">
+                <span>付款方式</span>
+                <select name="paymentMethod" id="payment-method-select" required>
+                  <option value="stripe">Stripe 在线支付</option>
+                  <option value="crypto">加密货币付款</option>
+                  <option value="bank_transfer">银行转账</option>
+                  <option value="wechat_pay">微信付款</option>
+                  <option value="alipay">支付宝付款</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-row">
+              <label>
+                <span>姓名</span>
+                <input type="text" name="customerName" placeholder="请输入收货人姓名" required>
+              </label>
+              <label>
+                <span>手机号</span>
+                <input type="tel" name="phone" placeholder="请输入手机号" required>
+              </label>
+            </div>
+            <div class="form-row">
+              <label>
+                <span>邮箱</span>
+                <input type="email" name="email" placeholder="请输入邮箱" required>
+              </label>
+              <label>
+                <span>国家 / 地区</span>
+                <input type="text" name="country" placeholder="例如 China" required>
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="full-width">
+                <span>地址</span>
+                <input type="text" name="addressLine1" placeholder="街道、门牌号、小区等" required>
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="full-width">
+                <span>地址补充</span>
+                <input type="text" name="addressLine2" placeholder="楼栋、单元、公司名等（可选）">
+              </label>
+            </div>
+            <div class="form-row">
+              <label>
+                <span>城市</span>
+                <input type="text" name="city" placeholder="城市" required>
+              </label>
+              <label>
+                <span>省 / 州</span>
+                <input type="text" name="region" placeholder="省份或州" required>
+              </label>
+              <label>
+                <span>邮编</span>
+                <input type="text" name="postalCode" placeholder="邮政编码" required>
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="full-width">
+                <span>备注</span>
+                <textarea name="remark" rows="4" placeholder="例如收货时间、其他要求等"></textarea>
+              </label>
+            </div>
+            <div class="checkout-summary">
+              <div>
+                <span class="meta-label">支付方式</span>
+                <strong id="checkout-payment-label">Stripe 在线支付</strong>
+              </div>
+              <div>
+                <span class="meta-label">订单金额</span>
+                <strong id="checkout-amount-label">$199.00</strong>
+              </div>
+            </div>
+            <div class="glass-card manual-payment-card hidden" id="manual-payment-card">
+              <p class="card-kicker">Manual payment</p>
+              <h3>当前付款说明</h3>
+              <p id="manual-payment-text">请按后台设置的付款说明完成支付，并联系人工确认。</p>
+            </div>
+            <div class="checkout-actions">
+              <button class="button button-primary" type="submit">提交订单并去付款</button>
+              <a class="button button-secondary" href="product.html">返回产品页</a>
+            </div>
+            <p class="form-status" id="checkout-status" aria-live="polite"></p>
+          </form>
+
+          <aside class="checkout-sidebar">
+            <div class="glass-card">
+              <p class="card-kicker">Contact support</p>
+              <h3>下单前有疑问？</h3>
+              <div class="contact-links" id="contact-links"></div>
+            </div>
+            <div class="glass-card">
+              <p class="card-kicker">Payment</p>
+              <h3>付款说明</h3>
+              <p id="checkout-payment-description">提交订单后会优先进入 Stripe 支付流程。若你选择人工付款方式，页面会展示对应的付款说明，并保留订单方便后续跟进。</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
