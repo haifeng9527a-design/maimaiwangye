@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>COLDARC | 提交订单</title>
-  <meta name="description" content="填写收货信息并提交 Ledger 订单，支持在线支付与客服联系。">
+  <meta name="description" content="填写收货信息并提交 Ledger 订单，支持人工收款确认、客服联系与发货通知。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -37,7 +37,7 @@
         <div class="hero-copy">
           <p class="eyebrow">Checkout</p>
           <h1>填写订单信息</h1>
-          <p class="hero-lead">请确认产品型号、联系方式和收货地址。提交后将跳转到支付页面。</p>
+          <p class="hero-lead">请确认产品型号、联系方式和收货地址。提交后系统会先创建订单，再按你选择的方式进行人工收款确认。</p>
         </div>
         <div class="hero-side-card glass-card">
           <p class="card-kicker">Order notes</p>
@@ -66,11 +66,11 @@
               <label class="full-width">
                 <span>付款方式</span>
                 <select name="paymentMethod" id="payment-method-select" required>
-                  <option value="stripe">Stripe 在线支付</option>
-                  <option value="crypto">加密货币付款</option>
                   <option value="bank_transfer">银行转账</option>
+                  <option value="crypto">加密货币付款</option>
                   <option value="wechat_pay">微信付款</option>
                   <option value="alipay">支付宝付款</option>
+                  <option value="stripe">Stripe 在线支付（备用）</option>
                 </select>
               </label>
             </div>
@@ -129,7 +129,7 @@
             <div class="checkout-summary">
               <div>
                 <span class="meta-label">支付方式</span>
-                <strong id="checkout-payment-label">Stripe 在线支付</strong>
+                <strong id="checkout-payment-label">银行转账</strong>
               </div>
               <div>
                 <span class="meta-label">订单金额</span>
@@ -142,8 +142,14 @@
               <p id="manual-payment-text">请按后台设置的付款说明完成支付，并联系人工确认。</p>
             </div>
             <div class="checkout-actions">
-              <button class="button button-primary" type="submit">提交订单并去付款</button>
+              <button class="button button-primary" type="submit">提交订单并获取付款说明</button>
               <a class="button button-secondary" href="product.html">返回产品页</a>
+            </div>
+            <div class="glass-card support-choice-card hidden" id="support-contact-actions">
+              <p class="card-kicker">Contact support now</p>
+              <h3>选择一种方式联系客服付款</h3>
+              <p>订单内容会自动带入聊天或邮件里，你只需要选择方便的方式继续。</p>
+              <div class="contact-links" id="support-contact-options"></div>
             </div>
             <p class="form-status" id="checkout-status" aria-live="polite"></p>
           </form>
@@ -157,7 +163,7 @@
             <div class="glass-card">
               <p class="card-kicker">Payment</p>
               <h3>付款说明</h3>
-              <p id="checkout-payment-description">提交订单后会优先进入 Stripe 支付流程。若你选择人工付款方式，页面会展示对应的付款说明，并保留订单方便后续跟进。</p>
+              <p id="checkout-payment-description">提交订单后会优先进入人工收款确认流程。页面会展示对应付款说明，你完成支付后，我们会在后台手动确认订单状态。</p>
             </div>
           </aside>
         </div>

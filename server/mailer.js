@@ -25,6 +25,16 @@ function getMailFrom() {
   return requireEnv("MAIL_FROM", requireEnv("SMTP_USER", ""));
 }
 
+function formatPaymentMethodLabel(method) {
+  return {
+    stripe: "Stripe 在线支付",
+    crypto: "加密货币付款",
+    bank_transfer: "银行转账",
+    wechat_pay: "微信付款",
+    alipay: "支付宝付款"
+  }[method] || method;
+}
+
 async function sendMail({ to, subject, html, text }) {
   const transporter = createTransporter();
   const from = getMailFrom();
@@ -84,6 +94,63 @@ function buildOrderConfirmationEmail(order, settings) {
   return { subject, html, text };
 }
 
+function buildSupportOrderAlertEmail(order, settings) {
+  const subject = `新订单待人工收款：${order.order_no}`;
+  const paymentHint = {
+    stripe: "客户选择了 Stripe 在线支付，可继续引导客户完成在线付款。",
+    crypto: settings.cryptoPaymentText || "客户选择了加密货币付款，请尽快发送链上收款地址。",
+    bank_transfer: settings.bankTransferText || "客户选择了银行转账，请尽快发送收款账户信息。",
+    wechat_pay: settings.wechatPaymentText || "客户选择了微信付款，请尽快发送微信收款方式。",
+    alipay: settings.alipayPaymentText || "客户选择了支付宝付款，请尽快发送支付宝收款方式。"
+  }[order.payment_method] || "请尽快联系客户确认付款方式。";
+
+  const addressLines = [
+    order.country,
+    order.region,
+    order.city,
+    order.address_line1,
+    order.address_line2,
+    order.postal_code
+  ].filter(Boolean).join(" / ");
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827;">
+      <h2>有新订单待跟进</h2>
+      <p>请尽快联系客户并提供收款方式。</p>
+      <ul>
+        <li>订单号：${order.order_no}</li>
+        <li>客户：${order.customer_name}</li>
+        <li>邮箱：${order.email}</li>
+        <li>手机号：${order.phone}</li>
+        <li>产品：${order.product_name}</li>
+        <li>数量：${order.quantity}</li>
+        <li>付款方式：${formatPaymentMethodLabel(order.payment_method)}</li>
+        <li>订单金额：${(order.amount_cents / 100).toFixed(2)} ${String(order.currency || "usd").toUpperCase()}</li>
+        <li>收货地址：${addressLines || "未填写完整"}</li>
+        <li>备注：${order.remark || "无"}</li>
+      </ul>
+      <p>${paymentHint}</p>
+    </div>
+  `;
+
+  const text = [
+    "有新订单待跟进",
+    `订单号：${order.order_no}`,
+    `客户：${order.customer_name}`,
+    `邮箱：${order.email}`,
+    `手机号：${order.phone}`,
+    `产品：${order.product_name}`,
+    `数量：${order.quantity}`,
+    `付款方式：${formatPaymentMethodLabel(order.payment_method)}`,
+    `订单金额：${(order.amount_cents / 100).toFixed(2)} ${String(order.currency || "usd").toUpperCase()}`,
+    `收货地址：${addressLines || "未填写完整"}`,
+    `备注：${order.remark || "无"}`,
+    paymentHint
+  ].join("\n");
+
+  return { subject, html, text };
+}
+
 function buildShippingEmail(order) {
   const subject = `订单已发货：${order.order_no}`;
   const html = `
@@ -115,5 +182,6 @@ function buildShippingEmail(order) {
 module.exports = {
   sendMail,
   buildOrderConfirmationEmail,
-  buildShippingEmail
+  buildShippingEmail,
+  buildSupportOrderAlertEmail
 };

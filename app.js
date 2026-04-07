@@ -48,20 +48,15 @@ const API_BASE = getApiBase();
 
 function getPaymentMethodMeta(settings) {
   return {
-    stripe: {
-      label: "Stripe 在线支付",
-      description: "提交订单后会自动跳转到 Stripe 支付页面完成付款。",
-      manualText: ""
+    bank_transfer: {
+      label: "银行转账",
+      description: "提交订单后会保留订单，并显示银行转账说明，由客服人工确认到账。",
+      manualText: settings.bankTransferText || "请联系客服获取银行转账收款信息。"
     },
     crypto: {
       label: "加密货币付款",
       description: "提交订单后会保留订单，并显示加密货币付款说明，由客服人工确认到账。",
       manualText: settings.cryptoPaymentText || "请联系客服获取链上收款地址。"
-    },
-    bank_transfer: {
-      label: "银行转账",
-      description: "提交订单后会保留订单，并显示银行转账说明，由客服人工确认到账。",
-      manualText: settings.bankTransferText || "请联系客服获取银行转账收款信息。"
     },
     wechat_pay: {
       label: "微信付款",
@@ -72,6 +67,11 @@ function getPaymentMethodMeta(settings) {
       label: "支付宝付款",
       description: "提交订单后会显示支付宝付款说明，请按后台说明完成支付并联系客服确认。",
       manualText: settings.alipayPaymentText || "请联系客服获取支付宝付款方式。"
+    },
+    stripe: {
+      label: "Stripe 在线支付（备用）",
+      description: "如你已准备好在线支付，也可以继续使用 Stripe 直接完成付款。",
+      manualText: ""
     }
   };
 }
@@ -151,7 +151,7 @@ function normalizeInstagramHref(value) {
   }
 
   const username = raw.replace(/^@+/, "").trim();
-  return username ? `https://instagram.com/${username}` : "";
+  return username ? `https://ig.me/m/${username}` : "";
 }
 
 function getContactIcon(key) {
@@ -197,45 +197,45 @@ function buildContactItems(settings) {
       key: "whatsapp",
       label: "WhatsApp",
       href: normalizeWhatsappHref(settings.whatsapp),
-      display: settings.whatsapp || "后台可配置",
+      display: String(settings.whatsapp || "").trim(),
       actionText: "点击打开聊天"
     },
     {
       key: "telegram",
       label: "Telegram",
       href: normalizeTelegramHref(settings.telegram),
-      display: settings.telegram || "后台可配置",
+      display: String(settings.telegram || "").trim(),
       actionText: "点击跳转私信"
     },
     {
       key: "wechat",
       label: "微信",
       href: "",
-      display: settings.wechat || "后台可配置",
-      actionText: "可在后台设置微信号"
+      display: "",
+      actionText: ""
     },
     {
       key: "email",
       label: "邮箱",
       href: normalizeEmailHref(settings.email),
-      display: settings.email || "后台可配置",
+      display: String(settings.email || "").trim(),
       actionText: "点击发送邮件"
     },
     {
       key: "phone",
       label: "手机号",
       href: normalizePhoneHref(settings.phone),
-      display: settings.phone || "后台可配置",
+      display: String(settings.phone || "").trim(),
       actionText: "点击直接拨号"
     },
     {
       key: "instagram",
       label: "Instagram",
       href: normalizeInstagramHref(settings.instagram),
-      display: settings.instagram || "后台可配置",
-      actionText: "点击查看主页"
+      display: String(settings.instagram || "").trim(),
+      actionText: "点击发起私信"
     }
-  ].filter((item) => String(item.display || "").trim() && item.display !== "后台可配置");
+  ].filter((item) => item.href && item.display);
 }
 
 function renderContactList(container, settings) {
@@ -277,6 +277,134 @@ function renderContactList(container, settings) {
 
     return `<a class="contact-link is-ready" href="${item.href}" target="_blank" rel="noreferrer">${content}</a>`;
   }).join("");
+}
+
+function renderSupportContactOptions(container, contacts) {
+  if (!container) {
+    return;
+  }
+
+  const items = Array.isArray(contacts) ? contacts.filter((item) => item && item.href) : [];
+  if (!items.length) {
+    container.innerHTML = "";
+    const panel = container.closest(".glass-card");
+    if (panel) {
+      panel.classList.add("hidden");
+    }
+    return;
+  }
+
+  const panel = container.closest(".glass-card");
+  if (panel) {
+    panel.classList.remove("hidden");
+  }
+
+  container.innerHTML = items.map((item) => `
+    <a class="contact-link is-ready" href="${item.href}" target="_blank" rel="noreferrer">
+      <span class="contact-icon contact-icon-${item.type}">
+        ${getContactIcon(item.type)}
+      </span>
+      <span class="contact-copy">
+        <span class="contact-name">${item.label}</span>
+        <span class="contact-value">${item.value || "立即联系"}</span>
+        <span class="contact-action">点击打开并自动带入订单信息</span>
+      </span>
+      <span class="contact-arrow" aria-hidden="true">↗</span>
+    </a>
+  `).join("");
+}
+
+function getFloatingContactItems(settings) {
+  return buildContactItems(settings).map((item) => ({
+    key: item.key,
+    label: item.label,
+    href: item.href,
+    value: item.display,
+    actionText: item.href ? item.actionText : "查看联系方式"
+  }));
+}
+
+function ensureFloatingSupportWidget() {
+  let widget = document.getElementById("floating-support-widget");
+  if (widget) {
+    return widget;
+  }
+
+  widget = document.createElement("div");
+  widget.id = "floating-support-widget";
+  widget.className = "floating-support-widget hidden";
+  widget.innerHTML = `
+    <button class="floating-support-toggle" id="floating-support-toggle" type="button" aria-expanded="false" aria-controls="floating-support-panel">
+      联系客服
+    </button>
+    <div class="floating-support-panel hidden" id="floating-support-panel">
+      <div class="floating-support-head">
+        <p class="card-kicker">Contact support</p>
+        <h3>联系客服</h3>
+        <p>选择一种方式立即咨询、获取付款方式或确认订单。</p>
+      </div>
+      <div class="floating-support-list" id="floating-support-list"></div>
+    </div>
+  `;
+
+  document.body.appendChild(widget);
+  return widget;
+}
+
+function renderFloatingSupportWidget(settings) {
+  if (document.body.dataset.page === "admin") {
+    return;
+  }
+
+  const items = getFloatingContactItems(settings);
+  if (!items.length) {
+    return;
+  }
+
+  const widget = ensureFloatingSupportWidget();
+  const toggle = widget.querySelector("#floating-support-toggle");
+  const panel = widget.querySelector("#floating-support-panel");
+  const list = widget.querySelector("#floating-support-list");
+
+  widget.classList.remove("hidden");
+  list.innerHTML = items.map((item) => {
+    const content = `
+      <span class="floating-support-icon contact-icon-${item.key}">
+        ${getContactIcon(item.key)}
+      </span>
+      <span class="floating-support-copy">
+        <span class="floating-support-name">${item.label}</span>
+        <span class="floating-support-value">${item.value}</span>
+        <span class="floating-support-action">${item.actionText}</span>
+      </span>
+      <span class="floating-support-arrow" aria-hidden="true">${item.href ? "↗" : ""}</span>
+    `;
+
+    if (!item.href) {
+      return `<div class="floating-support-item is-disabled">${content}</div>`;
+    }
+
+    return `<a class="floating-support-item" href="${item.href}" target="_blank" rel="noreferrer">${content}</a>`;
+  }).join("");
+
+  if (!toggle.dataset.bound) {
+    toggle.dataset.bound = "true";
+
+    toggle.addEventListener("click", () => {
+      const isOpen = !panel.classList.contains("hidden");
+      panel.classList.toggle("hidden", isOpen);
+      toggle.setAttribute("aria-expanded", String(!isOpen));
+      widget.classList.toggle("is-open", !isOpen);
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!widget.contains(event.target)) {
+        panel.classList.add("hidden");
+        toggle.setAttribute("aria-expanded", "false");
+        widget.classList.remove("is-open");
+      }
+    });
+  }
 }
 
 function updateSiteName(settings) {
@@ -336,6 +464,8 @@ async function handleCheckoutForm() {
   const paymentDescriptionNode = document.getElementById("checkout-payment-description");
   const manualPaymentCard = document.getElementById("manual-payment-card");
   const manualPaymentText = document.getElementById("manual-payment-text");
+  const supportContactActions = document.getElementById("support-contact-actions");
+  const supportContactOptions = document.getElementById("support-contact-options");
   const quantityInput = form.elements.namedItem("quantity");
   const productInput = form.elements.namedItem("productName");
   const paymentMethodInput = form.elements.namedItem("paymentMethod");
@@ -423,6 +553,13 @@ async function handleCheckoutForm() {
       if (data.manualPaymentInstructions) {
         manualPaymentCard.classList.remove("hidden");
         manualPaymentText.textContent = data.manualPaymentInstructions;
+      }
+
+      if (supportContactActions && supportContactOptions && Array.isArray(data.supportContacts)) {
+        renderSupportContactOptions(supportContactOptions, data.supportContacts);
+        if (data.supportContacts.length) {
+          supportContactActions.classList.remove("hidden");
+        }
       }
 
       statusNode.textContent = data.message
@@ -777,6 +914,7 @@ async function initSite() {
   const settings = await fetchSettings();
   populateContactSections(settings);
   mountSiteContactPanel(settings);
+  renderFloatingSupportWidget(settings);
 }
 
 initSite();

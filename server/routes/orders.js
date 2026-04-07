@@ -4,7 +4,8 @@ const db = require("../db");
 const { createOrderNumber, requireEnv } = require("../utils");
 const {
   sendMail,
-  buildOrderConfirmationEmail
+  buildOrderConfirmationEmail,
+  buildSupportOrderAlertEmail
 } = require("../mailer");
 
 const router = express.Router();
@@ -24,6 +25,123 @@ function getManualPaymentInstructions(settings, paymentMethod) {
     wechat_pay: settings.wechatPaymentText || "请联系客服获取微信付款方式。",
     alipay: settings.alipayPaymentText || "请联系客服获取支付宝付款方式。"
   }[paymentMethod] || "";
+}
+
+function formatPaymentMethodLabel(method) {
+  return {
+    stripe: "Stripe 在线支付",
+    crypto: "加密货币付款",
+    bank_transfer: "银行转账",
+    wechat_pay: "微信付款",
+    alipay: "支付宝付款"
+  }[method] || method;
+}
+
+function normalizeWhatsappHref(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+
+  const digits = raw.replace(/[^\d]/g, "");
+  return digits ? `https://wa.me/${digits}` : "";
+}
+
+function normalizeTelegramHref(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+
+  const username = raw.replace(/^@+/, "").trim();
+  return username ? `https://t.me/${username}` : "";
+}
+
+function normalizeEmailHref(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  return raw.startsWith("mailto:") ? raw : `mailto:${raw}`;
+}
+
+function buildMailtoHref(value, subject, body) {
+  const base = normalizeEmailHref(value);
+  if (!base) {
+    return "";
+  }
+
+  return `${base}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function normalizePhoneHref(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const normalized = raw.replace(/\s+/g, "");
+  return normalized.startsWith("tel:") ? normalized : `tel:${normalized}`;
+}
+
+function buildSupportMessage(order) {
+  return [
+    "你好，我刚提交了订单，想获取付款方式。",
+    `订单号：${order.order_no}`,
+    `姓名：${order.customer_name}`,
+    `产品：${order.product_name} x ${order.quantity}`,
+    `付款方式：${formatPaymentMethodLabel(order.payment_method)}`,
+    `手机号：${order.phone}`,
+    `邮箱：${order.email}`
+  ].join("\n");
+}
+
+function appendQuery(url, key, value) {
+  if (!url || !key || !value) {
+    return url;
+  }
+
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}${key}=${encodeURIComponent(value)}`;
+}
+
+function buildSupportContacts(options, order) {
+  const message = buildSupportMessage(order);
+  return [
+    {
+      type: "whatsapp",
+      label: "WhatsApp",
+      value: String(options.whatsapp || "").trim(),
+      href: appendQuery(normalizeWhatsappHref(options.whatsapp), "text", message)
+    },
+    {
+      type: "telegram",
+      label: "Telegram",
+      value: String(options.telegram || "").trim(),
+      href: appendQuery(normalizeTelegramHref(options.telegram), "text", message)
+    },
+    {
+      type: "email",
+      label: "邮箱",
+      value: String(options.email || "").trim(),
+      href: buildMailtoHref(options.email, `订单付款咨询 ${order.order_no}`, message)
+    },
+    {
+      type: "phone",
+      label: "电话",
+      value: String(options.phone || "").trim(),
+      href: normalizePhoneHref(options.phone)
+    }
+  ].filter((item) => item.href);
 }
 
 router.post("/", async (req, res) => {
@@ -98,6 +216,21 @@ router.post("/", async (req, res) => {
       notificationEmailSent = false;
     }
 
+    try {
+      const supportEmail = String(settings.email || "").trim();
+      if (supportEmail) {
+        const supportPayload = buildSupportOrderAlertEmail(createdOrder, settings);
+        await sendMail({
+          to: supportEmail,
+          ...supportPayload
+        });
+      }
+    } catch (_error) {
+      // 客服提醒发送失败不阻塞订单创建
+    }
+
+    const supportContacts = buildSupportContacts(settings, createdOrder);
+
     if (notificationEmailSent) {
       await db.updateOrderByNo(orderNo, {
         notification_email_sent: true
@@ -109,7 +242,8 @@ router.post("/", async (req, res) => {
         orderNo,
         paymentUrl: null,
         manualPaymentInstructions: getManualPaymentInstructions(settings, normalizedPaymentMethod),
-        message: "订单已创建，请按当前付款说明完成支付，并联系客服确认。"
+        supportContacts,
+        message: "订单已创建，订单信息已同步给客服，请立即选择一种方式联系客服获取付款方式并完成支付。"
       });
     }
 
@@ -150,7 +284,8 @@ router.post("/", async (req, res) => {
 
     return res.status(201).json({
       orderNo,
-      paymentUrl: session.url
+      paymentUrl: session.url,
+      supportContacts
     });
   } catch (error) {
     return res.status(500).json({
