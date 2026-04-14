@@ -1,11 +1,47 @@
+const fs = require("fs");
+const path = require("path");
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const multer = require("multer");
 const db = require("../db");
 const { requireAdmin } = require("../auth");
 const { requireEnv, sanitizeSettings, sanitizeProduct, signAdminToken } = require("../utils");
 const { sendMail, buildShippingEmail } = require("../mailer");
 
 const router = express.Router();
+const productUploadDir = path.join(__dirname, "..", "..", "assets", "uploads", "products");
+
+fs.mkdirSync(productUploadDir, { recursive: true });
+
+const productImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, productUploadDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
+      const safeBase = path.basename(file.originalname || "product-image", ext)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 60) || "product-image";
+
+      cb(null, `${Date.now()}-${safeBase}${ext}`);
+    }
+  }),
+  limits: {
+    fileSize: 8 * 1024 * 1024
+  },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
+    const isImageMime = file.mimetype && file.mimetype.startsWith("image/");
+    if (!isImageMime && !allowedExtensions.has(ext)) {
+      cb(new Error("仅支持上传图片文件。"));
+      return;
+    }
+
+    cb(null, true);
+  }
+});
 
 router.post("/login", async (req, res) => {
   const { username = "", password = "" } = req.body || {};
@@ -24,6 +60,22 @@ router.post("/login", async (req, res) => {
 
   const token = signAdminToken({ username });
   return res.json({ token });
+});
+
+router.post("/upload-image", requireAdmin, (req, res) => {
+  productImageUpload.single("image")(req, res, (error) => {
+    if (error) {
+      return res.status(400).json({ error: error.message || "图片上传失败。" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "请选择要上传的图片。" });
+    }
+
+    return res.status(201).json({
+      url: `/assets/uploads/products/${req.file.filename}`
+    });
+  });
 });
 
 router.get("/dashboard", requireAdmin, async (_req, res) => {

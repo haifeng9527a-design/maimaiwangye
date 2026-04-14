@@ -51,6 +51,27 @@ function getApiBase() {
 const API_BASE = getApiBase();
 const SESSION_STORAGE_KEY = "coldarc_session_id";
 const VISITOR_STORAGE_KEY = "coldarc_visitor_id";
+const CURATED_PRODUCT_IMAGE_LIBRARY = [
+  "canpingtupian/WhatsApp Image 2026-04-10 at 18.22.42.jpeg",
+  "canpingtupian/WhatsApp Image 2026-04-10 at 18.22.41.jpegqsfa.jpeg",
+  "canpingtupian/WhatsApp Image 2026-04-10 at 18.22.41.jpeg",
+  "canpingtupian/dasdafd10 at 18.22.43.jpeg",
+  "canpingtupian/dasdasd2.42.jpeg",
+  "canpingtupian/asdasdt 18.22.42.jpeg",
+  "canpingtupian/WhatsApp Image 2026-04-10 at 18.22.43.jpeg",
+  "canpingtupian/fasfasfge 2026-04-10 at 18.22.43.jpeg",
+  "canpingtupian/asda8.22.41.jpeg",
+  "canpingtupian/fasdfdasg-04-10 at 18.22.42.jpeg",
+  "canpingtupian/fdasfagd4-10 at 18.22.44.jpeg"
+];
+// 集中管理默认图片，后续接入整站新素材时可优先替换这里。
+const DEFAULT_PRODUCT_IMAGES = CURATED_PRODUCT_IMAGE_LIBRARY.slice(0, 3);
+const LEGACY_PRODUCT_IMAGE_MAP = {
+  "assets/images/ledger-hero.jpg": DEFAULT_PRODUCT_IMAGES[0],
+  "assets/images/ledger-side.jpg": CURATED_PRODUCT_IMAGE_LIBRARY[2],
+  "assets/images/ledger-detail.png": CURATED_PRODUCT_IMAGE_LIBRARY[9],
+  "assets/images/ledger-red-shot.jpg": CURATED_PRODUCT_IMAGE_LIBRARY[6]
+};
 
 function generateId(prefix = "id") {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
@@ -528,10 +549,46 @@ function applyImage(node, src, alt) {
     return;
   }
 
-  node.src = src;
+  node.src = normalizeProductImagePath(src) || DEFAULT_PRODUCT_IMAGES[0];
+  node.onerror = () => {
+    node.onerror = null;
+    node.src = DEFAULT_PRODUCT_IMAGES[0];
+  };
   if (alt) {
     node.alt = alt;
   }
+}
+
+function normalizeProductImagePath(src) {
+  const value = String(src || "").trim();
+  if (!value) {
+    return "";
+  }
+
+  return LEGACY_PRODUCT_IMAGE_MAP[value] || value;
+}
+
+function getProductImagePool(product) {
+  const gallery = Array.isArray(product?.galleryImageUrls)
+    ? product.galleryImageUrls.map(normalizeProductImagePath).filter(Boolean)
+    : [];
+
+  return Array.from(new Set([
+    normalizeProductImagePath(product?.primaryImageUrl),
+    ...gallery,
+    ...CURATED_PRODUCT_IMAGE_LIBRARY
+  ].filter(Boolean)));
+}
+
+function getProductImageSet(product) {
+  const gallery = getProductImagePool(product);
+  const primaryImage = gallery[0] || DEFAULT_PRODUCT_IMAGES[0];
+
+  return [
+    primaryImage,
+    gallery[1] || gallery[0] || DEFAULT_PRODUCT_IMAGES[1] || primaryImage,
+    gallery[2] || gallery[1] || DEFAULT_PRODUCT_IMAGES[2] || primaryImage
+  ];
 }
 
 function renderHomeProduct(product) {
@@ -539,26 +596,42 @@ function renderHomeProduct(product) {
     return;
   }
 
-  const gallery = Array.isArray(product.galleryImageUrls) ? product.galleryImageUrls : [];
-  const primaryImage = product.primaryImageUrl || gallery[0] || "";
-  const secondaryImage = gallery[1] || gallery[0] || primaryImage;
+  const imagePool = getProductImagePool(product);
+  const primaryImage = imagePool[0];
+  const secondaryImage = imagePool[1] || imagePool[4] || imagePool[0];
+  const tertiaryImage = imagePool[2] || imagePool[5] || secondaryImage;
 
   const nameNode = document.getElementById("home-product-name");
   const subtitleNode = document.getElementById("home-product-subtitle");
 
-  nameNode.textContent = "Ledger 授权现货与多型号选购";
-  subtitleNode.textContent = "主推品牌信任感与授权渠道保障，具体型号可在下方列表查看，并在下单页选择最适合你的版本。";
+  nameNode.innerHTML = "Ledger.<br>把重要资产留在自己手里";
+  subtitleNode.textContent = "授权现货、设备实拍、包装细节和第一次上手最重要的信息，都用更清楚的方式放在一个页面里。";
 
   applyImage(document.getElementById("home-product-primary-image"), primaryImage, "Ledger 品牌主图");
   applyImage(document.getElementById("home-product-secondary-image"), secondaryImage, "Ledger 品牌细节图");
+  applyImage(document.getElementById("home-product-tertiary-image"), tertiaryImage, "Ledger 品牌辅助图");
 
   const galleryNode = document.getElementById("home-product-gallery");
-  if (galleryNode && gallery.length) {
-    galleryNode.innerHTML = gallery.slice(0, 3).map((src, index) => `
-      <figure class="real-shot reveal">
-        <img src="${src}" alt="${product.name} 图片 ${index + 1}">
+  if (galleryNode) {
+    const lookbookImages = imagePool.slice(0, 4);
+    const primaryLook = lookbookImages[0] || DEFAULT_PRODUCT_IMAGES[0];
+    const secondLook = lookbookImages[1] || primaryLook;
+    const thirdLook = lookbookImages[2] || secondLook;
+    const fourthLook = lookbookImages[3] || secondLook;
+    galleryNode.innerHTML = `
+      <figure class="lookbook-card lookbook-card-feature reveal">
+        <img src="${primaryLook}" alt="${product.name} 主视觉图片">
       </figure>
-    `).join("");
+      <figure class="lookbook-card reveal">
+        <img src="${secondLook}" alt="${product.name} 展示图片 2">
+      </figure>
+      <figure class="lookbook-card reveal">
+        <img src="${thirdLook}" alt="${product.name} 展示图片 3">
+      </figure>
+      <figure class="lookbook-card lookbook-card-wide reveal">
+        <img src="${fourthLook}" alt="${product.name} 展示图片 4">
+      </figure>
+    `;
   }
 }
 
@@ -569,8 +642,8 @@ function renderHomeProductGrid(products = []) {
   }
 
   container.innerHTML = products.map((product, index) => {
-    const gallery = Array.isArray(product.galleryImageUrls) ? product.galleryImageUrls : [];
-    const imageUrl = product.primaryImageUrl || gallery[0] || "assets/images/ledger-hero.jpg";
+    const productPool = getProductImagePool(product);
+    const imageUrl = productPool[index + 3] || CURATED_PRODUCT_IMAGE_LIBRARY[(index * 3 + 1) % CURATED_PRODUCT_IMAGE_LIBRARY.length] || productPool[0];
     const bullets = [product.summary, product.subtitle, product.description]
       .map((item) => String(item || "").trim())
       .filter(Boolean)
@@ -578,7 +651,7 @@ function renderHomeProductGrid(products = []) {
 
     return `
       <article class="product-card ${index === 0 ? "featured" : ""} reveal">
-        <img class="card-thumb" src="${imageUrl}" alt="${product.name} 展示图">
+        <img class="card-thumb" src="${imageUrl}" alt="${product.name} 展示图" onerror="this.onerror=null;this.src='${DEFAULT_PRODUCT_IMAGES[0]}'">
         <p class="product-tag">${index === 0 ? "热门型号" : "在售型号"}</p>
         <h3>${product.name}</h3>
         <p>${product.summary || product.subtitle || "支持现货下单与发货说明。"}</p>
@@ -604,11 +677,11 @@ function renderProductModelGrid(products = []) {
   }
 
   container.innerHTML = products.map((product, index) => {
-    const gallery = Array.isArray(product.galleryImageUrls) ? product.galleryImageUrls : [];
-    const imageUrl = product.primaryImageUrl || gallery[0] || "assets/images/ledger-hero.jpg";
+    const productPool = getProductImagePool(product);
+    const imageUrl = productPool[index + 4] || CURATED_PRODUCT_IMAGE_LIBRARY[(index * 3 + 2) % CURATED_PRODUCT_IMAGE_LIBRARY.length] || productPool[0];
     return `
       <article class="product-card ${index === 0 ? "featured" : ""} reveal">
-        <img class="card-thumb" src="${imageUrl}" alt="${product.name} 型号图">
+        <img class="card-thumb" src="${imageUrl}" alt="${product.name} 型号图" onerror="this.onerror=null;this.src='${DEFAULT_PRODUCT_IMAGES[0]}'">
         <p class="product-tag">${index === 0 ? "热门型号" : "在售型号"}</p>
         <h3>${product.name}</h3>
         <p>${product.summary || product.subtitle || "支持现货下单与发货说明。"}</p>
@@ -629,20 +702,41 @@ function renderProductPage(product, products = []) {
     return;
   }
 
-  const gallery = Array.isArray(product.galleryImageUrls) ? product.galleryImageUrls : [];
-  const primaryImage = product.primaryImageUrl || gallery[0] || "";
+  const imagePool = getProductImagePool(product);
+  const [primaryImage, cleanImage, angleImage, detailImage] = imagePool;
 
-  document.getElementById("product-page-name").textContent = "Ledger 授权现货与型号选择";
+  document.getElementById("product-page-name").textContent = "Ledger 授权经销与设备实拍说明";
   document.getElementById("product-page-side-name").textContent = "Ledger 授权经销";
-  document.getElementById("product-page-subtitle").textContent = "先了解品牌、授权渠道、包装与交付方式，再在下方查看多个在售型号，最后到下单页选择具体版本。";
-  document.getElementById("product-page-summary").textContent = `当前支持 ${products.length || 1} 个在售型号，可在下单页按需求选择。`;
-  document.getElementById("product-page-detail-name").textContent = "品牌与包装说明";
-  document.getElementById("product-page-description").textContent = "这里重点展示 Ledger 品牌、包装交付和购买说明；具体型号、价格和版本差异，请以下方在售型号列表与下单页为准。";
+  document.getElementById("product-page-subtitle").textContent = "从品牌信任、包装交付到在售型号选择，把购买前最重要的信息集中在一个页面里。";
+  document.getElementById("product-page-summary").textContent = `当前支持 ${products.length || 1} 个在售型号，可在下单页按预算和需求选择。`;
+  document.getElementById("product-page-detail-name").textContent = "品牌与交付说明";
+  document.getElementById("product-page-description").textContent = "这里重点展示 Ledger 品牌、包装交付和购买逻辑；具体型号、价格与版本差异，请以下方在售型号列表与下单页为准。";
   document.getElementById("product-page-price").textContent = `${products.length || 1} 个型号可选`;
 
   applyImage(document.getElementById("product-page-primary-image"), primaryImage, "Ledger 品牌主展示图");
-  applyImage(document.getElementById("product-page-gallery-image-1"), gallery[1] || primaryImage, "Ledger 型号侧面图");
-  applyImage(document.getElementById("product-page-gallery-image-2"), gallery[2] || gallery[1] || primaryImage, "Ledger 型号细节图");
+  applyImage(document.getElementById("product-page-gallery-image-1"), cleanImage, "Ledger 型号正面图");
+  applyImage(document.getElementById("product-page-gallery-image-2"), angleImage, "Ledger 型号角度图");
+  applyImage(document.getElementById("product-page-gallery-image-3"), detailImage, "Ledger 型号细节图");
+
+  const mediaWall = document.getElementById("product-media-wall");
+  if (mediaWall) {
+    const wallClasses = [
+      "wall-card-hero",
+      "wall-card-tall",
+      "wall-card-wide",
+      "wall-card-square",
+      "wall-card-wide",
+      "wall-card-large",
+      "wall-card-square",
+      "wall-card-wide",
+      "wall-card-square"
+    ];
+    mediaWall.innerHTML = imagePool.slice(0, 8).map((src, index) => `
+      <figure class="media-wall-card ${wallClasses[index] || "wall-card-square"} reveal">
+        <img src="${src}" alt="${product.name} 图集 ${index + 1}">
+      </figure>
+    `).join("");
+  }
 }
 
 async function hydrateProductContent() {
@@ -1303,6 +1397,34 @@ async function updateOrder(token, orderNo, payload) {
   }
 }
 
+async function uploadAdminProductImage(token, file) {
+  if (!token) {
+    throw new Error("请先重新登录。");
+  }
+
+  if (!file) {
+    throw new Error("请先选择图片。");
+  }
+
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const response = await fetch(`${API_BASE}/api/admin/upload-image`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: formData
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "图片上传失败。");
+  }
+
+  return data.url || "";
+}
+
 async function handleAdminPage() {
   const loginForm = document.getElementById("admin-login-form");
   if (!loginForm) {
@@ -1321,6 +1443,10 @@ async function handleAdminPage() {
   const logoutButton = document.getElementById("admin-logout");
   const productResetButton = document.getElementById("product-reset-button");
   const productDeleteButton = document.getElementById("product-delete-button");
+  const uploadPrimaryImageButton = document.getElementById("upload-primary-image-button");
+  const uploadGalleryImagesButton = document.getElementById("upload-gallery-images-button");
+  const primaryImageFileInput = document.getElementById("product-primary-image-file");
+  const galleryImageFilesInput = document.getElementById("product-gallery-image-files");
 
   const refresh = async () => {
     const token = window.localStorage.getItem(tokenKey);
@@ -1382,8 +1508,11 @@ async function handleAdminPage() {
     event.preventDefault();
     settingsStatus.textContent = "正在保存设置...";
     try {
-      const token = await refresh();
       const payload = Object.fromEntries(new FormData(settingsForm).entries());
+      const token = window.localStorage.getItem(tokenKey);
+      if (!token) {
+        throw new Error("请先重新登录。");
+      }
       const response = await fetch(`${API_BASE}/api/settings`, {
         method: "PUT",
         headers: {
@@ -1510,6 +1639,57 @@ async function handleAdminPage() {
   productResetButton?.addEventListener("click", () => {
     populateProductForm(null);
     productStatus.textContent = "已切换到新建商品。";
+  });
+
+  uploadPrimaryImageButton?.addEventListener("click", async () => {
+    productStatus.textContent = "正在上传主图...";
+    try {
+      const token = window.localStorage.getItem(tokenKey);
+      const file = primaryImageFileInput?.files?.[0];
+      const url = await uploadAdminProductImage(token, file);
+      const primaryImageField = productForm?.elements.namedItem("primaryImageUrl");
+      if (primaryImageField) {
+        primaryImageField.value = url;
+      }
+      if (primaryImageFileInput) {
+        primaryImageFileInput.value = "";
+      }
+      productStatus.textContent = `主图已上传，URL 已填入：${url}`;
+    } catch (error) {
+      productStatus.textContent = error.message || "主图上传失败。";
+    }
+  });
+
+  uploadGalleryImagesButton?.addEventListener("click", async () => {
+    productStatus.textContent = "正在上传图集图片...";
+    try {
+      const token = window.localStorage.getItem(tokenKey);
+      const files = Array.from(galleryImageFilesInput?.files || []);
+      if (!files.length) {
+        throw new Error("请先选择至少一张图集图片。");
+      }
+
+      const urls = [];
+      for (const file of files) {
+        urls.push(await uploadAdminProductImage(token, file));
+      }
+
+      const galleryField = productForm?.elements.namedItem("galleryImageUrls");
+      if (galleryField) {
+        const existing = String(galleryField.value || "")
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean);
+        galleryField.value = [...existing, ...urls].join("\n");
+      }
+
+      if (galleryImageFilesInput) {
+        galleryImageFilesInput.value = "";
+      }
+      productStatus.textContent = `已上传 ${urls.length} 张图，URL 已自动追加到图集列表。`;
+    } catch (error) {
+      productStatus.textContent = error.message || "图集上传失败。";
+    }
   });
 
   productDeleteButton?.addEventListener("click", async () => {

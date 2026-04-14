@@ -24,6 +24,15 @@ const defaultSettingsRow = {
   alipay_qr_code_url: ""
 };
 
+const defaultProductImages = {
+  primary: "canpingtupian/WhatsApp Image 2026-04-10 at 18.22.42.jpeg",
+  gallery: [
+    "canpingtupian/WhatsApp Image 2026-04-10 at 18.22.42.jpeg",
+    "canpingtupian/WhatsApp Image 2026-04-10 at 18.22.41.jpeg",
+    "canpingtupian/fasdfdasg-04-10 at 18.22.42.jpeg"
+  ]
+};
+
 const defaultProduct = {
   slug: "ledger-nano-x",
   name: "Ledger Nano X",
@@ -32,12 +41,8 @@ const defaultProduct = {
   compare_price_usd: 229,
   summary: "支持现货下单、收货验货、新手使用引导。",
   description: "Ledger Nano X 适合长期持有、冷存储和第一次购买硬钱包的用户。",
-  primary_image_url: "assets/images/ledger-hero.jpg",
-  gallery_image_urls: [
-    "assets/images/ledger-hero.jpg",
-    "assets/images/ledger-side.jpg",
-    "assets/images/ledger-detail.png"
-  ],
+  primary_image_url: defaultProductImages.primary,
+  gallery_image_urls: defaultProductImages.gallery,
   is_active: true,
   sort_order: 1
 };

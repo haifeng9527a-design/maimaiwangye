@@ -186,8 +186,8 @@ values (
   229.00,
   '支持现货下单、收货验货、新手使用引导。',
   'Ledger Nano X 适合长期持有、冷存储和第一次购买硬钱包的用户。',
-  'assets/images/ledger-hero.jpg',
-  '["assets/images/ledger-hero.jpg","assets/images/ledger-side.jpg","assets/images/ledger-detail.png"]'::jsonb,
+  'canpingtupian/WhatsApp Image 2026-04-10 at 18.22.42.jpeg',
+  '["canpingtupian/WhatsApp Image 2026-04-10 at 18.22.42.jpeg","canpingtupian/WhatsApp Image 2026-04-10 at 18.22.41.jpeg","canpingtupian/fasdfdasg-04-10 at 18.22.42.jpeg"]'::jsonb,
   true,
   1
 )
